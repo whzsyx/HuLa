@@ -58,7 +58,7 @@
                 :options="dropdownOptions"
                 @select="(key: string) => handleFriendAction(key, item.applyId)">
                 <n-icon class="cursor-pointer px-6px">
-                  <svg class="size-16px"><use href="#more"></use></svg>
+                  <svg class="size-16px color-[--text-color]"><use href="#more"></use></svg>
                 </n-icon>
               </n-dropdown>
             </n-flex>
@@ -186,6 +186,11 @@ const handleFriendAction = async (action: string, applyId: string) => {
     }, 600)
   }
 }
+
+onMounted(() => {
+  // 组件挂载时刷新一次列表
+  contactStore.getRequestFriendsList(true)
+})
 </script>
 
 <style scoped lang="scss"></style>

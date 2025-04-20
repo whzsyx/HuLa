@@ -1,4 +1,4 @@
-import { LimitEnum, MittEnum, MsgEnum, MessageStatusEnum } from '@/enums'
+import { LimitEnum, MittEnum, MsgEnum, MessageStatusEnum, RoomTypeEnum } from '@/enums'
 import { useUserInfo } from '@/hooks/useCached.ts'
 import apis from '@/services/apis.ts'
 import { useCachedStore, type BaseUserItem } from '@/stores/cached.ts'
@@ -271,7 +271,7 @@ export const useMsgInput = (messageInputDom: Ref) => {
       if (html.includes('data-type="emoji"')) {
         const tmp = document.createElement('div')
         tmp.innerHTML = html
-        const imgElement = tmp.querySelector('img')
+        const imgElement = tmp.querySelector<HTMLImageElement>('img[data-type]')
         if (imgElement && imgElement.src) {
           return (msgInput.value = imgElement.src)
         }
@@ -301,6 +301,8 @@ export const useMsgInput = (messageInputDom: Ref) => {
     }
   }
 
+  const retainRawContent = (type: MsgEnum) => [MsgEnum.EMOJI, MsgEnum.IMAGE].includes(type)
+
   /** 处理发送信息事件 */
   // TODO 输入框中的内容当我切换消息的时候需要记录之前输入框的内容 (nyh -> 2024-03-01 07:03:43)
   const send = async () => {
@@ -309,13 +311,6 @@ export const useMsgInput = (messageInputDom: Ref) => {
       window.$message.warning(`一次性只能上传${LimitEnum.COM_COUNT}个文件或图片`)
       return
     }
-    // 排除id="replyDiv"的元素的内容
-    const replyDiv = messageInputDom.value.querySelector('#replyDiv')
-    if (replyDiv) {
-      replyDiv.parentNode?.removeChild(replyDiv)
-      // 然后重新赋值给msgInput
-      msgInput.value = messageInputDom.value.innerHTML.replace(replyDiv.outerHTML, '')
-    }
     const contentType = getMessageContentType(messageInputDom)
     //根据消息类型获取消息处理策略
     const messageStrategy = messageStrategyMap[contentType]
@@ -323,7 +318,14 @@ export const useMsgInput = (messageInputDom: Ref) => {
       window.$message.warning('暂不支持发送类型消息')
       return
     }
-
+    // 排除id="replyDiv"的元素的内容
+    const replyDiv = messageInputDom.value.querySelector('#replyDiv')
+    if (replyDiv) {
+      replyDiv?.remove()
+      // 如果回复的内容是一个链接，那么需要保留链接数据
+      if (!retainRawContent(contentType))
+        msgInput.value = messageInputDom.value.innerHTML.replace(replyDiv.outerHTML, '')
+    }
     const msg = await messageStrategy.getMsg(msgInput.value, reply.value)
     const atUidList = extractAtUserIds(msgInput.value, cachedStore.currentAtUsersList)
     const tempMsgId = Date.now().toString()
@@ -379,12 +381,20 @@ export const useMsgInput = (messageInputDom: Ref) => {
         console.log(`${msg.type === MsgEnum.EMOJI ? '表情包' : '图片'}上传完成,更新为服务器URL:`, messageBody.url)
       }
 
+      console.log('发送消息到服务器 ===>>> ', {
+        roomId: globalStore.currentSession.roomId,
+        msgType: msg.type,
+        body: messageBody
+      })
+
       // 发送消息到服务器
       const res = await apis.sendMsg({
         roomId: globalStore.currentSession.roomId,
         msgType: msg.type,
         body: messageBody
       })
+
+      console.log('服务器返回的消息 ===> ', res)
 
       // 停止发送状态的定时器
       clearTimeout(statusTimer)
@@ -444,6 +454,16 @@ export const useMsgInput = (messageInputDom: Ref) => {
     /** 获取当前光标位置和文本内容 */
     const cursorPosition = selection.focusOffset
     const text = curNode.textContent
+
+    // 判断是群聊并且有用户列表时才触发@提及
+    if (
+      globalStore.currentSession.type === RoomTypeEnum.GROUP &&
+      cachedStore.currentAtUsersList.length === 0 &&
+      text.includes('@')
+    ) {
+      // 如果当前群聊没有加载用户列表，尝试加载
+      await cachedStore.getGroupAtUserBaseInfo()
+    }
 
     await handleTrigger(text, cursorPosition, { range, selection, keyword: '' })
   }, 0)
@@ -606,35 +626,89 @@ export const useMsgInput = (messageInputDom: Ref) => {
     useMitt.on(MittEnum.REPLY_MEG, (event: any) => {
       console.log('🐝正在回复消息:', event)
 
-      const accountName = useUserInfo(event.fromUser.uid).value.name!
-      const avatar = useUserInfo(event.fromUser.uid).value.avatar!
-      // 如果已经有回复消息，则替换掉原来的回复消息
-      if (reply.value.content) {
-        // 触发id为closeBtn的按钮点击事件，从而关闭第一个回复框，实现回复消息的替换
-        document.getElementById('closeBtn')?.dispatchEvent(new Event('click'))
-      }
-      // if (!Array.isArray(event.message.body.content)) {
-      //   // 回复前把包含&nbsp;的字符替换成空格
-      //   event.message.body.content = event.message.body.content.replace(/&nbsp;/g, ' ')
-      // }
-      reply.value = {
-        imgCount: 0,
-        avatar: avatar,
-        accountName: accountName,
-        content: event.message.body.content || event.message.body.url,
-        key: event.message.id
-      }
-      if (messageInputDom.value) {
+      // 如果输入框不存在，直接返回
+      if (!messageInputDom.value) return
+
+      try {
+        const accountName = useUserInfo(event.fromUser.uid).value.name!
+        const avatar = useUserInfo(event.fromUser.uid).value.avatar!
+
+        // 步骤1: 确保输入框先获得焦点
+        messageInputDom.value.focus()
+
+        // 步骤2: 完全清理现有的回复状态
+        // 如果已经有回复消息，需要先移除现有的回复框
+        const existingReplyDiv = document.getElementById('replyDiv')
+        if (existingReplyDiv) {
+          existingReplyDiv.remove()
+        }
+
+        // 始终重置reply状态，确保完全清除之前的回复状态
+        reply.value = { avatar: '', imgCount: 0, accountName: '', content: '', key: 0 }
+
+        // 步骤3: 处理回复内容
+        // 回复前把包含&nbsp;的字符替换成空格
+        let content = event.message.body.content || event.message.body.url
+        if (content && typeof content === 'string') {
+          content = content.replace(/&nbsp;/g, ' ')
+        } else if (Array.isArray(content)) {
+          content = content.map((item: string) => {
+            return typeof item === 'string' ? item.replace(/&nbsp;/g, ' ') : item
+          })
+        }
+
+        // 步骤4: 设置新的回复内容
+        reply.value = {
+          imgCount: 0,
+          avatar: avatar,
+          accountName: accountName,
+          content: content,
+          key: event.message.id
+        }
+
+        // 步骤5: 在DOM更新后插入回复框
         nextTick().then(() => {
-          focusOn(messageInputDom.value)
-          // 插入回复框
-          insertNode(
-            MsgEnum.REPLY,
-            { avatar: avatar, accountName: accountName, content: reply.value.content },
-            {} as HTMLElement
-          )
-          updateSelectionRange(getEditorRange())
+          try {
+            // 再次确保输入框获得焦点
+            messageInputDom.value.focus()
+
+            // 创建一个合适的选区，确保回复框被插入到正确的位置
+            const selection = window.getSelection()
+
+            if (!selection) return
+
+            // 移除所有现有的选区
+            selection.removeAllRanges()
+
+            // 创建新选区
+            const range = document.createRange()
+            range.selectNodeContents(messageInputDom.value)
+            range.collapse(true) // 将范围折叠到开始位置
+
+            // 应用选区
+            selection.addRange(range)
+
+            // 保存选区以便后续使用
+            updateSelectionRange({ range, selection })
+
+            // 插入回复框
+            insertNode(
+              MsgEnum.REPLY,
+              { avatar: avatar, accountName: accountName, content: reply.value.content },
+              {} as HTMLElement
+            )
+
+            // 确保光标位置在正确的位置
+            messageInputDom.value.focus()
+
+            // 触发input事件以更新UI
+            triggerInputEvent(messageInputDom.value)
+          } catch (err) {
+            console.error('插入回复框时错误:', err)
+          }
         })
+      } catch (err) {
+        console.error('回复_meg处理程序错误:', err)
       }
     })
   })

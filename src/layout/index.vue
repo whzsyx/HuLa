@@ -45,6 +45,7 @@ import { useCachedStore } from '@/stores/cached'
 import { clearListener, initListener, readCountQueue } from '@/utils/ReadCountQueue'
 import { type } from '@tauri-apps/plugin-os'
 import { useConfigStore } from '@/stores/config'
+import { UserAttentionType } from '@tauri-apps/api/window'
 
 const loadingPercentage = ref(10)
 const loadingText = ref('正在加载应用...')
@@ -228,6 +229,8 @@ useMitt.on(WsResponseMessageType.RECEIVE_MESSAGE, async (data: MessageType) => {
     // 只有非免打扰的会话才发送通知
     if (session && isVisible && session.muteNotification !== NotificationTypeEnum.NOT_DISTURB) {
       await emitTo('notify', 'notify_cotent', data)
+      // 请求用户注意窗口
+      home?.requestUserAttention(UserAttentionType.Critical)
       const throttleSendNotification = useThrottleFn(() => {
         sendNotification({
           title: username,
@@ -278,6 +281,22 @@ useMitt.on(
 useMitt.on(WsResponseMessageType.REQUEST_APPROVAL_FRIEND, async () => {
   // 刷新好友列表以获取最新状态
   await contactStore.getContactList(true)
+})
+useMitt.on(WsResponseMessageType.ROOM_INFO_CHANGE, async (data: { roomId: string; name: string; avatar: string }) => {
+  // 根据roomId修改对应房间中的群名称和群头像
+  const { roomId, name, avatar } = data
+
+  // 更新chatStore中的会话信息
+  chatStore.updateSession(roomId, {
+    name,
+    avatar
+  })
+
+  // 如果当前正在查看的是该群聊，则需要刷新群组详情
+  if (globalStore.currentSession?.roomId === roomId && globalStore.currentSession.type === RoomTypeEnum.GROUP) {
+    // 重新获取群组信息统计
+    await groupStore.getCountStatistic()
+  }
 })
 
 onBeforeMount(async () => {

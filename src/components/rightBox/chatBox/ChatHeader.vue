@@ -83,12 +83,13 @@
         </n-popover>
       </div>
 
-      <div class="options-box">
+      <div class="options-box" @click="handleCreateGroupOrInvite">
         <n-popover trigger="hover" :show-arrow="false" placement="bottom">
           <template #trigger>
             <svg><use href="#launch"></use></svg>
           </template>
-          <span>发起群聊</span>
+          <span v-if="activeItem.type === RoomTypeEnum.GROUP">邀请进群</span>
+          <span v-else>发起群聊</span>
         </n-popover>
       </div>
 
@@ -331,24 +332,30 @@ import { AvatarUtils } from '@/utils/AvatarUtils'
 import { OnlineEnum } from '@/enums'
 import { useTauriListener } from '@/hooks/useTauriListener'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { RoomTypeEnum, SessionOperateEnum } from '@/enums'
+import { RoomTypeEnum, SessionOperateEnum, RoleEnum } from '@/enums'
 import { useMitt } from '@/hooks/useMitt.ts'
 import { useUserStatusStore } from '@/stores/userStatus'
+import { useUserStore } from '@/stores/user.ts'
 import apis from '@/services/apis'
 import AvatarCropper from '@/components/common/AvatarCropper.vue'
 import { useAvatarUpload } from '@/hooks/useAvatarUpload'
+import { useWindow } from '@/hooks/useWindow'
+import { useGlobalStore } from '@/stores/global'
 
 const appWindow = WebviewWindow.getCurrent()
 const { activeItem } = defineProps<{
   activeItem: SessionItem
 }>()
+const { createModalWindow } = useWindow()
 const { addListener } = useTauriListener()
 // 使用useDisplayMedia获取屏幕共享的媒体流
 const { stream, start, stop } = useDisplayMedia()
 const chatStore = useChatStore()
 const groupStore = useGroupStore()
+const globalStore = useGlobalStore()
 const contactStore = useContactStore()
 const userStatusStore = useUserStatusStore()
+const userStore = useUserStore()
 /** 提醒框标题 */
 const tips = ref()
 const optionsType = ref<RoomActEnum>()
@@ -368,7 +375,23 @@ const originalGroupDetail = ref({
   groupRemark: ''
 })
 // 是否为群主
-const isGroupOwner = computed(() => groupDetail.value.role === 1)
+const isGroupOwner = computed(() => {
+  // 频道不能修改群头像和群名称
+  if (activeItem.roomId === '1' || activeItem.hotFlag === IsAllUserEnum.Yes) {
+    return false
+  }
+
+  // 检查groupStore.userList中当前用户的角色
+  const currentUser = groupStore.userList.find((user) => user.uid === userStore.userInfo.uid)
+
+  // 如果能在userList找到用户信息并确认角色，优先使用这个判断
+  if (currentUser) {
+    return currentUser.roleId === RoleEnum.LORD
+  }
+
+  // 否则回退到countInfo中的角色信息
+  return groupDetail.value.role === RoleEnum.LORD
+})
 // 我的群备注
 const myGroupRemark = computed(() => {
   if (activeItem.type === RoomTypeEnum.GROUP) {
@@ -511,6 +534,20 @@ watch(
   }
 )
 
+watch(
+  () => groupStore.userList,
+  () => {
+    // 当群成员列表更新时，重新检查当前用户的权限
+    if (activeItem.type === RoomTypeEnum.GROUP) {
+      const currentUser = groupStore.userList.find((user) => user.uid === userStore.userInfo.uid)
+      if (currentUser && currentUser.roleId) {
+        groupDetail.value.role = currentUser.roleId
+      }
+    }
+  },
+  { deep: true }
+)
+
 watchEffect(() => {
   if (!messageOptions.value?.isLoading) {
     isLoading.value = false
@@ -520,13 +557,38 @@ watchEffect(() => {
   }
 })
 
+/** 处理创建群聊或邀请进群 */
+const handleCreateGroupOrInvite = () => {
+  if (activeItem.type === RoomTypeEnum.GROUP) {
+    handleInvite()
+  } else {
+    handleCreateGroup()
+  }
+}
+
+/** 处理创建群聊 */
+const handleCreateGroup = () => {
+  console.log(111)
+}
+
+/** 处理邀请进群 */
+const handleInvite = async () => {
+  // 使用封装后的createModalWindow方法创建模态窗口
+  await createModalWindow('邀请好友进群', 'modal-invite', 600, 500, 'home')
+}
+
 // 获取群组详情
 const fetchGroupDetail = async () => {
   if (!activeItem.roomId || activeItem.type !== RoomTypeEnum.GROUP) return
+
+  // 检查当前用户在userList中的角色
+  const currentUser = groupStore.userList.find((user) => user.uid === userStore.userInfo.uid)
+
   groupDetail.value = {
     myNickname: groupStore.countInfo?.myName || '',
     groupRemark: groupStore.countInfo?.remark || '',
-    role: groupStore.countInfo?.role || 3 // 添加角色信息
+    // 优先使用userList中找到的角色信息，没有则使用countInfo中的role或默认值
+    role: currentUser?.roleId || groupStore.countInfo?.role || RoleEnum.NORMAL
   }
   // 保存原始值，用于后续比较
   originalGroupDetail.value = {
@@ -665,6 +727,17 @@ const handleShield = (value: boolean) => {
       // 更新本地会话状态
       chatStore.updateSession(activeItem.roomId, {
         shield: value
+      })
+
+      // 1. 先保存当前聊天室ID
+      const tempRoomId = globalStore.currentSession.roomId
+
+      // 2. 设置为空值，触发清除当前消息
+      globalStore.currentSession.roomId = ''
+
+      // 3. 在下一个tick中恢复原来的聊天室ID，触发重新加载消息
+      nextTick(() => {
+        globalStore.currentSession.roomId = tempRoomId
       })
 
       window.$message.success(value ? '已屏蔽消息' : '已取消屏蔽')
@@ -855,5 +928,9 @@ onUnmounted(() => {
   &:hover .avatar-hover {
     opacity: 1;
   }
+}
+
+:deep(.n-scrollbar > .n-scrollbar-container > .n-scrollbar-content) {
+  padding-left: 2px;
 }
 </style>

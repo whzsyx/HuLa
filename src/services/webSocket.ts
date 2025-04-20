@@ -83,9 +83,18 @@ class WS {
       localStorage.removeItem('user')
     }
     const clientId = await getEnhancedFingerprint()
+    const savedProxy = localStorage.getItem('proxySettings')
+    let serverUrl = import.meta.env.VITE_WEBSOCKET_URL
+    if (savedProxy) {
+      const settings = JSON.parse(savedProxy)
+      const suffix = settings.wsIp + ':' + settings.wsPort + '/' + settings.wsSuffix
+      if (settings.wsType === 'ws' || settings.wsType === 'wss') {
+        serverUrl = settings.wsType + '://' + suffix
+      }
+    }
     // 初始化 ws
     worker.postMessage(
-      `{"type":"initWS","value":{"token":${token ? `"${token}"` : null},"clientId":${clientId ? `"${clientId}"` : null}}}`
+      `{"type":"initWS","value":{"token":${token ? `"${token}"` : null},"clientId":${clientId ? `"${clientId}", "serverUrl":"${serverUrl}"` : null}}}`
     )
   }
 
@@ -295,6 +304,18 @@ class WS {
               myName: string
               roomId: string
               uid: string
+            }
+          )
+          break
+        }
+        case WsResponseMessageType.ROOM_INFO_CHANGE: {
+          console.log('群主修改群聊信息', params.data)
+          useMitt.emit(
+            WsResponseMessageType.ROOM_INFO_CHANGE,
+            params.data as {
+              roomId: string
+              name: string
+              avatar: string
             }
           )
           break
