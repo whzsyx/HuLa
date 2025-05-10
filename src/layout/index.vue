@@ -45,6 +45,8 @@ import { useCachedStore } from '@/stores/cached'
 import { clearListener, initListener, readCountQueue } from '@/utils/ReadCountQueue'
 import { type } from '@tauri-apps/plugin-os'
 import { useConfigStore } from '@/stores/config'
+import { UserAttentionType } from '@tauri-apps/api/window'
+import { useCheckUpdate } from '@/hooks/useCheckUpdate'
 
 const loadingPercentage = ref(10)
 const loadingText = ref('正在加载应用...')
@@ -99,10 +101,27 @@ const userStore = useUserStore()
 const chatStore = useChatStore()
 const cachedStore = useCachedStore()
 const configStore = useConfigStore()
+const { checkUpdate, CHECK_UPDATE_TIME } = useCheckUpdate()
 const userUid = computed(() => userStore.userInfo.uid)
 // 清空未读消息
 // globalStore.unReadMark.newMsgUnreadCount = 0
 const shrinkStatus = ref(false)
+
+// 导入Web Worker
+const timerWorker = new Worker(new URL('../workers/timer.worker.ts', import.meta.url))
+
+// 添加错误处理
+timerWorker.onerror = (error) => {
+  console.error('[Worker Error]', error)
+}
+
+// 监听 Worker 消息
+timerWorker.onmessage = (e) => {
+  const { type } = e.data
+  if (type === 'timeout') {
+    checkUpdate('home')
+  }
+}
 
 watch(
   () => userStore.isSign,
@@ -168,11 +187,11 @@ useMitt.on(WsResponseMessageType.ONLINE, async (onStatusChangeType: OnStatusChan
   }
 })
 useMitt.on(WsResponseMessageType.TOKEN_EXPIRED, async (wsTokenExpire: WsTokenExpire) => {
-  if (Number(userUid) === Number(wsTokenExpire.uid) && userStore.userInfo.client === wsTokenExpire.client) {
+  if (Number(userUid.value) === Number(wsTokenExpire.uid) && userStore.userInfo.client === wsTokenExpire.client) {
+    console.log('收到用户token过期通知', wsTokenExpire)
     // 聚焦主窗口
     const home = await WebviewWindow.getByLabel('home')
     await home?.setFocus()
-    console.log('账号在其他设备登录', wsTokenExpire)
     useMitt.emit(MittEnum.LEFT_MODAL_SHOW, {
       type: ModalEnum.REMOTE_LOGIN,
       props: {
@@ -189,8 +208,16 @@ useMitt.on(WsResponseMessageType.INVALID_USER, (param: { uid: string }) => {
   // 群成员列表删掉拉黑的用户
   groupStore.filterUser(data.uid)
 })
-useMitt.on(WsResponseMessageType.MSG_MARK_ITEM, (markList: MarkItemType[]) => {
-  chatStore.updateMarkCount(markList)
+useMitt.on(WsResponseMessageType.MSG_MARK_ITEM, (data: { markList: MarkItemType[] }) => {
+  console.log('收到消息标记更新:', data)
+
+  // 确保data.markList是一个数组再传递给updateMarkCount
+  if (data && data.markList && Array.isArray(data.markList)) {
+    chatStore.updateMarkCount(data.markList)
+  } else if (data && !Array.isArray(data)) {
+    // 兼容处理：如果直接收到了单个MarkItemType对象
+    chatStore.updateMarkCount([data as unknown as MarkItemType])
+  }
 })
 useMitt.on(WsResponseMessageType.MSG_RECALL, (data: RevokedMsgType) => {
   chatStore.updateRecallStatus(data)
@@ -228,6 +255,8 @@ useMitt.on(WsResponseMessageType.RECEIVE_MESSAGE, async (data: MessageType) => {
     // 只有非免打扰的会话才发送通知
     if (session && isVisible && session.muteNotification !== NotificationTypeEnum.NOT_DISTURB) {
       await emitTo('notify', 'notify_cotent', data)
+      // 请求用户注意窗口
+      home?.requestUserAttention(UserAttentionType.Critical)
       const throttleSendNotification = useThrottleFn(() => {
         sendNotification({
           title: username,
@@ -279,6 +308,26 @@ useMitt.on(WsResponseMessageType.REQUEST_APPROVAL_FRIEND, async () => {
   // 刷新好友列表以获取最新状态
   await contactStore.getContactList(true)
 })
+useMitt.on(WsResponseMessageType.ROOM_INFO_CHANGE, async (data: { roomId: string; name: string; avatar: string }) => {
+  // 根据roomId修改对应房间中的群名称和群头像
+  const { roomId, name, avatar } = data
+
+  // 更新chatStore中的会话信息
+  chatStore.updateSession(roomId, {
+    name,
+    avatar
+  })
+
+  // 如果当前正在查看的是该群聊，则需要刷新群组详情
+  if (globalStore.currentSession?.roomId === roomId && globalStore.currentSession.type === RoomTypeEnum.GROUP) {
+    // 重新获取群组信息统计
+    await groupStore.getCountStatistic()
+  }
+})
+useMitt.on(WsResponseMessageType.ROOM_DISSOLUTION, async () => {
+  // 刷新群聊列表
+  await contactStore.getGroupChatList()
+})
 
 onBeforeMount(async () => {
   // 默认执行一次
@@ -300,9 +349,23 @@ onMounted(async () => {
     const permission = await requestPermission()
     permissionGranted = permission === 'granted'
   }
+  setInterval(() => {
+    // 使用 Worker 来处理定时器
+    timerWorker.postMessage({
+      type: 'startTimer',
+      msgId: 'checkUpdate',
+      duration: 1000
+    })
+  }, CHECK_UPDATE_TIME)
 })
 
 onUnmounted(() => {
   clearListener()
+  // 清除Web Worker计时器
+  timerWorker.postMessage({
+    type: 'clearTimer',
+    msgId: 'checkUpdate'
+  })
+  timerWorker.terminate()
 })
 </script>

@@ -26,7 +26,9 @@ import {
   Login,
   SearchFriend,
   SearchGroup,
-  ConfigType
+  ConfigType,
+  AnnouncementItem,
+  PageResponse
 } from '@/services/types'
 
 import request from '@/services/request'
@@ -161,13 +163,17 @@ export default {
   /** 获取验证码 */
   getCaptcha: () => GET<{ img: string; uuid: string }>(urls.getCaptcha),
   /** 发送验证码 */
-  sendCaptcha: (params: { email: string; code: string; uuid: string }) => POST<void>(urls.sendCaptcha, params),
+  sendCaptcha: (params: { email: string; code: string; uuid?: string; operationType?: 'register' | 'forgot' }) =>
+    POST<void>(urls.sendCaptcha, params),
   /** 检查token是否有效 */
   checkToken: () => POST<string>(urls.checkToken),
   /** 获取所有用户状态 */
   getAllUserState: () => GET<UserState[]>(urls.getAllUserState),
   /** 用户状态改变 */
   changeUserState: (userStateId: string) => POST(`${urls.changeUserState}/${userStateId}`),
+  /** 忘记密码 */
+  forgetPassword: (params: { email: string; code: string; uuid: string; password: string }) =>
+    POST<void>(urls.forgetPassword, params),
   /** 初始化配置 */
   initConfig: () => GET<ConfigType>(urls.initConfig),
   /** 获取七牛token */
@@ -177,5 +183,16 @@ export default {
       domain: string
       token: string
       region?: string
-    }>(urls.getQiniuToken)
+    }>(urls.getQiniuToken),
+  /** 获取群公告列表 */
+  getAnnouncementList: (roomId: string, params: { current: number; size: number }) =>
+    GET<PageResponse<AnnouncementItem[]>>(`${urls.getAnnouncementList}/${roomId}`, params),
+  /** 发布群公告 */
+  pushAnnouncement: (params: { roomId: string; content: string; top: boolean }) =>
+    POST<{ msg: string; data: boolean }>(urls.pushAnnouncement, params),
+  /** 删除群公告 */
+  deleteAnnouncement: (id: string) => POST<{ msg: string; data: boolean }>(`${urls.deleteAnnouncement}/${id}`, {}),
+  /** 编辑群公告 */
+  editAnnouncement: (params: { id: string; roomId: string; content: string; top: boolean }) =>
+    POST<any>(urls.editAnnouncement, params)
 }

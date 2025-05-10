@@ -1,5 +1,65 @@
 
 
+## [2.6.10](https://github.com/HuLaSpark/HuLa/compare/v2.6.9...v2.6.10) (2025-05-05)
+
+
+### ✨ Features | 新功能
+
+* **component:** :sparkles: 增加公告类型消息 ([f0b0656](https://github.com/HuLaSpark/HuLa/commit/f0b0656ddc874a597a49de2e4f8666913730e759))
+* **view:** :sparkles: 新增发布群公告功能 ([#259](https://github.com/HuLaSpark/HuLa/issues/259)) ([87fc30d](https://github.com/HuLaSpark/HuLa/commit/87fc30d170996022379b45d9b94110edbe1c5c74))
+
+
+### 🐛 Bug Fixes | Bug 修复
+
+* **chat:** 隔离聊天窗口内部数据 ([#258](https://github.com/HuLaSpark/HuLa/issues/258)) ([635f729](https://github.com/HuLaSpark/HuLa/commit/635f72996b8e03e1c00bc20fe9ad870ae8d303f4))
+* **component:** :bug: 修复表情包圆角样式 ([e5e1725](https://github.com/HuLaSpark/HuLa/commit/e5e1725d42b41c2bc518e5f4c91cbdbb5f2a3421))
+* **component:** :bug: 修复公告排序问题、公告加载更多重复数据问题 ([8d21d22](https://github.com/HuLaSpark/HuLa/commit/8d21d2228a6f743faa1aa4bf635d9fe8d41efd1f))
+* **component:** :bug: 修复链接卡片无法点击后默认浏览器打开的问题 ([296a944](https://github.com/HuLaSpark/HuLa/commit/296a944c9f0312548e668ae1a6b831d821b502d2))
+* **component:** :bug: 修复全选意外选中全部内容的问题 ([6616a93](https://github.com/HuLaSpark/HuLa/commit/6616a932c57a7189d1540575332471d03684f49b))
+* **component:** :bug: 修改群聊中群消息设置逻辑 ([62460fb](https://github.com/HuLaSpark/HuLa/commit/62460fbfe04802764d5a4d60430d587ecbee528d))
+* **component:** :bug: 修改url文本解析样式 ([0d5455c](https://github.com/HuLaSpark/HuLa/commit/0d5455c9c590406878c572b667dbf8d21ae7a5b1))
+* **readme:** :bug: 修改readme中的描述 ([91feb14](https://github.com/HuLaSpark/HuLa/commit/91feb14ff4fa77c6bb11aeddd90863cd197fec78))
+
+
+### ⚡️ Performance Improvements | 性能优化
+
+* **component:** :zap: 优化消息点赞和不满功能 ([4d17127](https://github.com/HuLaSpark/HuLa/commit/4d171273e9ba4f6e584206720eeae636d72626e6))
+
+## [2.6.9](https://github.com/HuLaSpark/HuLa/compare/v2.6.8...v2.6.9) (2025-04-20)
+
+
+### ✨ Features | 新功能
+
+* 回复可以回复表情包、图片 ([#251](https://github.com/HuLaSpark/HuLa/issues/251)) ([4180906](https://github.com/HuLaSpark/HuLa/commit/418090604a08a189ae94d487f762406a3bc853ab))
+* **hooks:** 优化消息类型判断逻辑 ([#249](https://github.com/HuLaSpark/HuLa/issues/249)) ([82c3fd5](https://github.com/HuLaSpark/HuLa/commit/82c3fd529c96153a198f1425d02751173761de0b))
+* **view:** :sparkles: 新增中版本强制更新功能 ([#252](https://github.com/HuLaSpark/HuLa/issues/252)) ([edbd3de](https://github.com/HuLaSpark/HuLa/commit/edbd3defccdfe0d1b6163e82193316f3044217db)), closes [#183](https://github.com/HuLaSpark/HuLa/issues/183) [#183](https://github.com/HuLaSpark/HuLa/issues/183) [#183](https://github.com/HuLaSpark/HuLa/issues/183)
+* **view:** :sparkles: 新增子窗口创建方式和邀请加群功能 ([b2a15ca](https://github.com/HuLaSpark/HuLa/commit/b2a15ca5e219b32115702d06f937a396ddaf57c5))
+* **worker:** :sparkles: 代理实现 ([#232](https://github.com/HuLaSpark/HuLa/issues/232)) ([d4bf21d](https://github.com/HuLaSpark/HuLa/commit/d4bf21d464cc1faea22abcb5369daef6360cd1e0)), closes [#197](https://github.com/HuLaSpark/HuLa/issues/197)
+
+
+### 🐛 Bug Fixes | Bug 修复
+
+* 修复回复框错位 BUG ([#256](https://github.com/HuLaSpark/HuLa/issues/256)) ([e46ee95](https://github.com/HuLaSpark/HuLa/commit/e46ee95bb872812101fb0938a6ffdf161a28308f)), closes [#253](https://github.com/HuLaSpark/HuLa/issues/253)
+* **common:** :bug: 修复回复表情包或者emoji的时候位置偏移 ([f9a2b18](https://github.com/HuLaSpark/HuLa/commit/f9a2b184735a718ea1063f0914837d0bef36367c))
+* **common:** :bug: 修复FloatBlockList组件悬浮层bug ([2b9a7ed](https://github.com/HuLaSpark/HuLa/commit/2b9a7edaef876aeea2a9c4605e136c413675a4f2))
+* **config:** :bug: 修复renovate配置问题 ([6b02f3f](https://github.com/HuLaSpark/HuLa/commit/6b02f3fc61f73bf65e594e9aa23aa610996be429))
+* **hook:** :bug: 修复回复时出现空格符和回复替换等问题 ([b8c3c4e](https://github.com/HuLaSpark/HuLa/commit/b8c3c4eec26212a584f3e368c7b4782b2c5e8f07))
+* **hook:** :bug: 修改mac下子窗口创建逻辑 ([7f8795c](https://github.com/HuLaSpark/HuLa/commit/7f8795c36a158359aaf82e491c927ddf5c80c8ee))
+* **hooks:** :bug: 修复一些xss的问题 ([bcce4a0](https://github.com/HuLaSpark/HuLa/commit/bcce4a01d4a0955d82dcbb82ec570435fa69a343))
+* **layout:** :bug: 回退增加系统通知功能 ([c7fbdd7](https://github.com/HuLaSpark/HuLa/commit/c7fbdd7a0290355a186732f2419ceddc20741e01))
+* **message:** 将消息内容解析为文本而不当做 HTML 处理 [#237](https://github.com/HuLaSpark/HuLa/issues/237) ([#246](https://github.com/HuLaSpark/HuLa/issues/246)) ([3441b8a](https://github.com/HuLaSpark/HuLa/commit/3441b8a28286c9e69f27338a6974ebd26eeb69bf))
+* **Plugins:** :bug: 修复插件卸载后，重新打开插件列表，状态依旧是安装状态问题 ([#247](https://github.com/HuLaSpark/HuLa/issues/247)) ([3cee949](https://github.com/HuLaSpark/HuLa/commit/3cee9498d79a0f2b00fd5ecbac87f3d260d4b449))
+* **Plugins:** :bug: 修复插件卸载后，重新打开插件列表，状态依旧是安装状态问题（list布局） ([#248](https://github.com/HuLaSpark/HuLa/issues/248)) ([9e4f31e](https://github.com/HuLaSpark/HuLa/commit/9e4f31ea526230a0ce0e1f8b48302c3dc5792eb8))
+* **view:** :bug: 修复会话中转义字符的问题 ([b793f71](https://github.com/HuLaSpark/HuLa/commit/b793f71f26507a4e9b6402dd8a3dd3cfac75c5f8))
+
+
+### ⚡️ Performance Improvements | 性能优化
+
+* **component:** :zap: 优化链接的展示和解析 ([74bf370](https://github.com/HuLaSpark/HuLa/commit/74bf3702c73b751c0e3165c357064136896d548f))
+* **component:** :zap: 优化屏蔽后的逻辑 ([2a5b9de](https://github.com/HuLaSpark/HuLa/commit/2a5b9de68b64ceacd535074aaf6284060d869918))
+* **component:** :zap: 优化群备注和群昵称(beta) ([fab231a](https://github.com/HuLaSpark/HuLa/commit/fab231a9166acac97d50426109e2e37364a2d794))
+* **rust:** :zap: 修改mac系统托盘的右键菜单 ([6dbfa49](https://github.com/HuLaSpark/HuLa/commit/6dbfa496b4c18581e5915890033c6ebdf65a6976))
+
 ## [2.6.8](https://github.com/HuLaSpark/HuLa/compare/v2.6.7...v2.6.8) (2025-03-26)
 
 

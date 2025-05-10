@@ -83,9 +83,18 @@ class WS {
       localStorage.removeItem('user')
     }
     const clientId = await getEnhancedFingerprint()
+    const savedProxy = localStorage.getItem('proxySettings')
+    let serverUrl = import.meta.env.VITE_WEBSOCKET_URL
+    if (savedProxy) {
+      const settings = JSON.parse(savedProxy)
+      const suffix = settings.wsIp + ':' + settings.wsPort + '/' + settings.wsSuffix
+      if (settings.wsType === 'ws' || settings.wsType === 'wss') {
+        serverUrl = settings.wsType + '://' + suffix
+      }
+    }
     // 初始化 ws
     worker.postMessage(
-      `{"type":"initWS","value":{"token":${token ? `"${token}"` : null},"clientId":${clientId ? `"${clientId}"` : null}}}`
+      `{"type":"initWS","value":{"token":${token ? `"${token}"` : null},"clientId":${clientId ? `"${clientId}", "serverUrl":"${serverUrl}"` : null}}}`
     )
   }
 
@@ -242,9 +251,8 @@ class WS {
           useMitt.emit(WsResponseMessageType.INVALID_USER, params.data as { uid: number })
           break
         }
-        // 点赞、倒赞消息通知
+        // 点赞、不满消息通知
         case WsResponseMessageType.MSG_MARK_ITEM: {
-          console.log('点赞')
           useMitt.emit(WsResponseMessageType.MSG_MARK_ITEM, params.data as { markList: MarkItemType[] })
           break
         }
@@ -297,6 +305,47 @@ class WS {
               uid: string
             }
           )
+          break
+        }
+        case WsResponseMessageType.ROOM_INFO_CHANGE: {
+          console.log('群主修改群聊信息', params.data)
+          useMitt.emit(
+            WsResponseMessageType.ROOM_INFO_CHANGE,
+            params.data as {
+              roomId: string
+              name: string
+              avatar: string
+            }
+          )
+          break
+        }
+        case WsResponseMessageType.ROOM_GROUP_NOTICE_MSG: {
+          console.log('发布群公告', params.data)
+          useMitt.emit(
+            WsResponseMessageType.ROOM_GROUP_NOTICE_MSG,
+            params.data as {
+              id: string
+              content: string
+              top: string
+            }
+          )
+          break
+        }
+        case WsResponseMessageType.ROOM_EDIT_GROUP_NOTICE_MSG: {
+          console.log('编辑群公告', params.data)
+          useMitt.emit(
+            WsResponseMessageType.ROOM_EDIT_GROUP_NOTICE_MSG,
+            params.data as {
+              id: string
+              content: string
+              top: string
+            }
+          )
+          break
+        }
+        case WsResponseMessageType.ROOM_DISSOLUTION: {
+          console.log('群解散', params.data)
+          useMitt.emit(WsResponseMessageType.ROOM_DISSOLUTION, params.data)
           break
         }
         default: {

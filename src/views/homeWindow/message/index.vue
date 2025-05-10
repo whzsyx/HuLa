@@ -45,8 +45,12 @@
             </n-flex>
 
             <n-flex align="center" justify="space-between">
-              <span class="text flex-1 leading-tight text-12px truncate" v-html="item.lastMsg.replace(':', '：')">
-              </span>
+              <template v-if="item.isAtMe">
+                <span class="text flex-1 leading-tight text-12px truncate" v-html="item.lastMsg.replace(':', '：')" />
+              </template>
+              <template v-else>
+                <span class="text flex-1 leading-tight text-12px truncate" v-text="item.lastMsg.replace(':', '：')" />
+              </template>
 
               <!-- 消息提示 -->
               <template v-if="item.muteNotification === 1 && !item.unreadCount">
@@ -144,6 +148,13 @@ const sessionList = computed(() => {
           latestAvatar = useUserInfo(item.id).value.avatar || item.avatar
         }
 
+        // 获取群聊备注名称（如果有）
+        let displayName = item.name
+        if (item.type === RoomTypeEnum.GROUP && item.remark) {
+          // 使用群组备注（如果存在）
+          displayName = item.remark
+        }
+
         if (lastMsg) {
           const lastMsgUserName = useUserInfo(lastMsg.fromUser.uid)
 
@@ -160,6 +171,15 @@ const sessionList = computed(() => {
 
           const atPrefix = isAtMe ? '<span class="text-#d5304f mr-4px">[有人@我]</span>' : ''
 
+          // 获取正常的消息内容
+          const messageContent = renderReplyContent(
+            lastMsgUserName.value.name,
+            lastMsg.message?.type,
+            lastMsg.message?.body?.content || lastMsg.message?.body,
+            item.type
+          ) as string
+
+          // 撤回消息直接显示文本，没有HTML
           LastUserMsg =
             lastMsg.message?.type === MsgEnum.RECALL
               ? item.type === RoomTypeEnum.GROUP
@@ -167,20 +187,29 @@ const sessionList = computed(() => {
                 : lastMsg.fromUser.uid === userUid.value
                   ? '你撤回了一条消息'
                   : '对方撤回了一条消息'
-              : `${atPrefix}${
-                  renderReplyContent(
-                    lastMsgUserName.value.name,
-                    lastMsg.message?.type,
-                    lastMsg.message?.body?.content || lastMsg.message?.body,
-                    item.type
-                  ) as string
-                }`
+              : isAtMe
+                ? `${atPrefix}${messageContent}` // 有人@我时才保留HTML标签
+                : messageContent // 正常消息内容已在renderReplyContent中被转义
+
+          // 返回带有isAtMe标记的对象和修改后的名称
+          return {
+            ...item,
+            avatar: latestAvatar,
+            name: displayName, // 使用可能修改过的显示名称
+            lastMsg: LastUserMsg || item.text || '欢迎使用HuLa',
+            lastMsgTime: formatTimestamp(item?.activeTime),
+            isAtMe: isAtMe
+          }
         }
+
+        // 如果没有最后一条消息，则返回不带@标记的对象，但也包含修改后的名称
         return {
           ...item,
           avatar: latestAvatar,
-          lastMsg: LastUserMsg || item.text || '欢迎使用HuLa',
-          lastMsgTime: formatTimestamp(item?.activeTime)
+          name: displayName, // 使用可能修改过的显示名称
+          lastMsg: item.text || '欢迎使用HuLa',
+          lastMsgTime: formatTimestamp(item?.activeTime),
+          isAtMe: false
         }
       })
       // 添加排序逻辑：先按置顶状态排序，再按活跃时间排序
@@ -254,6 +283,7 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 @use '@/styles/scss/message';
+
 #image-no-data {
   @apply size-full mt-60px text-[--text-color] text-14px;
 }

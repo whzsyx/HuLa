@@ -106,7 +106,7 @@
             target-filterable
             v-model:value="selectedValue"
             :options="options"
-            :render-source-list="renderSourceList"
+            :render-source-list="renderSourceList()"
             :render-target-label="renderLabel" />
 
           <n-flex align="center" justify="center" class="p-16px">
@@ -186,9 +186,9 @@ watchEffect(() => {
   if (width.value >= 800) {
     useMitt.emit(MittEnum.SHRINK_WINDOW, false)
     // TODO: 因为拖动后要重新加载所以这里会监听两次，后续优化
-    if (currentMsg.value) {
-      useMitt.emit(MittEnum.MSG_BOX_SHOW, { msgBoxShow: true, ...currentMsg.value })
-    }
+    // if (currentMsg.value) {
+    //   useMitt.emit(MittEnum.MSG_BOX_SHOW, { msgBoxShow: true, ...currentMsg.value })
+    // }
     const center = document.querySelector('#center')
     center?.classList.remove('flex-1')
     isDrag.value = true
@@ -268,6 +268,11 @@ const stopDrag = () => {
 onMounted(async () => {
   useMitt.on(MittEnum.SHRINK_WINDOW, (event: boolean) => {
     shrinkStatus.value = event
+  })
+  useMitt.on(MittEnum.CREATE_GROUP, (event: { id: string }) => {
+    createGroupModal.value = true
+    console.log(event)
+    // TODO: 选用并且禁用当前 event.id 对应的uid的用户
   })
   useMitt.on(MittEnum.MSG_BOX_SHOW, (event: any) => {
     if (!event) return

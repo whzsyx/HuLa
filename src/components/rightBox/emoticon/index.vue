@@ -70,11 +70,11 @@
               <n-flex
                 align="center"
                 justify="center"
-                class="emoji-item"
+                class="emoji-item py-4px"
                 v-for="(item, index) in emojiStore.emojiList"
                 :key="index"
                 @click.stop="chooseEmoji(item.expressionUrl, 'url')">
-                <n-popover trigger="hover" :delay="300" :duration="300" :show-arrow="false" placement="top">
+                <n-popover trigger="hover" :delay="600" :duration="0" :show-arrow="false" placement="top">
                   <template #trigger>
                     <n-image
                       width="60"

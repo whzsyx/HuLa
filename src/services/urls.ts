@@ -1,6 +1,20 @@
 import { URLEnum } from '@/enums'
 
-const { VITE_SERVICE_URL } = import.meta.env
+let { VITE_SERVICE_URL } = import.meta.env
+const savedProxy = localStorage.getItem('proxySettings')
+if (savedProxy) {
+  const settings = JSON.parse(savedProxy)
+  const suffix = settings.apiIp + ':' + settings.apiPort + '/' + settings.apiSuffix
+  switch (settings.apiType) {
+    case 'http':
+    case 'https':
+    case 'socket5':
+      VITE_SERVICE_URL = settings.apiType + '://' + suffix
+      break
+    default:
+      break
+  }
+}
 const prefix = VITE_SERVICE_URL
 
 export default {
@@ -60,6 +74,10 @@ export default {
   updateMyRoomInfo: `${prefix + URLEnum.ROOM}/updateMyRoomInfo`, // 修改“我”的群聊名称
   searchGroup: `${prefix + URLEnum.ROOM}/search`, // 搜索群聊
   applyGroup: `${prefix + URLEnum.ROOM}/applyGroup`, // 申请加群
+  getAnnouncementList: `${prefix + URLEnum.ROOM}/announcement/list`, // 获取群公告
+  pushAnnouncement: `${prefix + URLEnum.ROOM}/announcement/push`, // 发布群公告
+  deleteAnnouncement: `${prefix + URLEnum.ROOM}/announcement/delete`, // 删除群公告
+  editAnnouncement: `${prefix + URLEnum.ROOM}/announcement/edit`, // 编辑群公告
 
   // -------------- 验证码 ---------------
   getCaptcha: `${prefix + URLEnum.CAPTCHA}/captcha`, // 获取图片验证码
@@ -75,5 +93,6 @@ export default {
   login: `${prefix + URLEnum.TOKEN}/login`, // 登录
   refreshToken: `${prefix + URLEnum.TOKEN}/refreshToken`, // 续签
   logout: `${prefix + URLEnum.TOKEN}/logout`, // 退出登录
-  checkToken: `${prefix + URLEnum.TOKEN}/check` // 检查token是否有效
+  checkToken: `${prefix + URLEnum.TOKEN}/check`, // 检查token是否有效
+  forgetPassword: `${prefix + URLEnum.TOKEN}/forgotPassword` // 忘记密码
 }

@@ -1,6 +1,6 @@
 /** 气泡样式 */
 @mixin bubble {
-  @apply w-fit min-h-1em p-[8px_12px] text-14px line-height-22px bg-[--bg-bubble] rounded-[2px_18px_18px] custom-shadow;
+  @apply w-fit select-text min-h-1em p-[8px_12px] text-14px line-height-22px bg-[--bg-bubble] rounded-[2px_18px_18px] custom-shadow;
   max-width: var(--bubble-max-width, 32vw); /** 默认为群聊宽度 */
   white-space: normal; /** 保留空白符号并正常换行 */
   word-break: break-all; /** 强制在单词内部进行换行 */
@@ -23,9 +23,9 @@
   }
 }
 .bubble {
-  &::selection {
-    background: transparent; /* 设置选中背景为透明 */
-  }
+  // &::selection {
+  //   background: transparent; /* 设置选中背景为透明 */
+  // }
   @include bubble;
 }
 .bubble-oneself {
@@ -99,7 +99,7 @@
 }
 /** emoji回复气泡的样式 */
 .emoji-reply-bubble {
-  @apply relative rounded-50px p-[4px_8px] cursor-pointer select-none bg-#13987F66 text-14px w-fit border-(1px solid #13987F) custom-shadow;
+  @apply relative flex-y-center gap-4px rounded-50px p-[4px_8px] cursor-pointer select-none bg-#13987F66 text-14px w-fit border-(1px solid #13987F) custom-shadow;
 }
 /** 跳转到回复内容时候显示的样式 */
 .active-reply {
@@ -166,6 +166,25 @@
 .fade-translate-enter-from,
 .fade-translate-leave-to {
   opacity: 0;
+}
+
+// 置顶公告样式
+.feishu-announcement {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  background-color: var(--bg-notice, rgba(19, 152, 127, 0.08));
+  border-radius: 8px;
+  border: 1px solid var(--bg-notice, rgba(19, 152, 127, 0.2));
+  margin: 6px 12px 0 12px;
+  height: 34px;
+  transition: all 0.3s ease-in-out;
+  z-index: 10;
+}
+
+.announcement-hover {
+  background-color: var(--bg-notice-hover, rgba(19, 152, 127, 0.14));
 }
 
 /**! 替换ait的字体颜色 */

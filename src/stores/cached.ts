@@ -246,6 +246,19 @@ export const useCachedStore = defineStore(StoresEnum.CACHED, () => {
     return userCachedList[uid]?.name || ''
   }
 
+  /**
+   * 获取群组公告
+   * @roomId 群组ID
+   * @reload 是否强制重新加载
+   * @returns 群组公告列表
+   */
+  const getGroupAnnouncementList = async (roomId: string, page: number, size: number) => {
+    const data = await apis.getAnnouncementList(roomId, { current: page, size: size })
+    if (data) {
+      return data
+    }
+  }
+
   return {
     userCachedList,
     badgeCachedList,
@@ -260,6 +273,7 @@ export const useCachedStore = defineStore(StoresEnum.CACHED, () => {
     updateUserCache,
     updateUserGroupNickname,
     getUserGroupNickname,
-    userGroupNicknameMap
+    userGroupNicknameMap,
+    getGroupAnnouncementList
   }
 })

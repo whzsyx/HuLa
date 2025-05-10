@@ -213,13 +213,22 @@ const addFriend = async () => {
   globalStore.addFriendModalInfo.uid = uid
 }
 
-// 注入 enableAllScroll 方法
-const { enableScroll } = inject('popoverControls', { enableScroll: () => {} })
+let enableScroll = () => {}
 
 const handleOpenMsgSession = async (uid: string) => {
   enableScroll() // 在打开新会话前恢复所有滚动
   await openMsgSession(uid)
 }
+
+onMounted(() => {
+  // 注入 enableAllScroll 方法
+  const popoverControls = inject('popoverControls', { enableScroll: () => {} })
+  enableScroll = () => {
+    if (typeof popoverControls.enableScroll === 'function') {
+      popoverControls.enableScroll()
+    }
+  }
+})
 </script>
 
 <style scoped lang="scss">

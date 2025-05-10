@@ -9,6 +9,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     ActionBar: typeof import('./../components/windows/ActionBar.vue')['default']
+    Announcement: typeof import('./../components/rightBox/renderMessage/Announcement.vue')['default']
     ApplyList: typeof import('./../components/rightBox/ApplyList.vue')['default']
     AvatarCropper: typeof import('./../components/common/AvatarCropper.vue')['default']
     ChatBox: typeof import('./../components/rightBox/chatBox/index.vue')['default']
@@ -67,11 +68,15 @@ declare module 'vue' {
     NSkeleton: typeof import('naive-ui')['NSkeleton']
     NSpace: typeof import('naive-ui')['NSpace']
     NSpin: typeof import('naive-ui')['NSpin']
+    NStep: typeof import('naive-ui')['NStep']
+    NSteps: typeof import('naive-ui')['NSteps']
     NSwitch: typeof import('naive-ui')['NSwitch']
     NTab: typeof import('naive-ui')['NTab']
     NTabPane: typeof import('naive-ui')['NTabPane']
     NTabs: typeof import('naive-ui')['NTabs']
     NTag: typeof import('naive-ui')['NTag']
+    NTimeline: typeof import('naive-ui')['NTimeline']
+    NTimelineItem: typeof import('naive-ui')['NTimelineItem']
     NTooltip: typeof import('naive-ui')['NTooltip']
     NTransfer: typeof import('naive-ui')['NTransfer']
     NVirtualList: typeof import('naive-ui')['NVirtualList']
