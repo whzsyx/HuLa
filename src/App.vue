@@ -3,27 +3,30 @@
     <div v-if="!isLock" id="app-container">
       <router-view />
     </div>
-
     <!-- 锁屏页面 -->
     <LockScreen v-else />
   </NaiveProvider>
 </template>
 <script setup lang="ts">
 import { useSettingStore } from '@/stores/setting.ts'
-import { StoresEnum, ThemeEnum } from '@/enums'
+import { MittEnum, StoresEnum, ThemeEnum } from '@/enums'
 import LockScreen from '@/views/LockScreen.vue'
 import router from '@/router'
 import { type } from '@tauri-apps/plugin-os'
 import { useLogin } from '@/hooks/useLogin.ts'
 import { useStorage } from '@vueuse/core'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { useMitt } from '@/hooks/useMitt.ts'
+import { useWindow } from '@/hooks/useWindow.ts'
 
 const appWindow = WebviewWindow.getCurrent()
+const { createWebviewWindow } = useWindow()
 const settingStore = useSettingStore()
 const { themes, lockScreen, page } = storeToRefs(settingStore)
 const { resetLoginState, logout } = useLogin()
 const token = useStorage('TOKEN', null)
 const refreshToken = useStorage('REFRESH_TOKEN', null)
+
 /** 不需要锁屏的页面 */
 const LockExclusion = new Set(['/login', '/tray', '/qrCode', '/about', '/onlineStatus'])
 const isLock = computed(() => {
@@ -131,6 +134,15 @@ onMounted(async () => {
     // 最后调用登出方法(这会创建登录窗口)
     await logout()
   })
+  useMitt.on(MittEnum.CHECK_UPDATE, async () => {
+    const checkUpdateWindow = await WebviewWindow.getByLabel('checkupdate')
+    await checkUpdateWindow?.show()
+  })
+  useMitt.on(MittEnum.DO_UPDATE, async (event) => {
+    await createWebviewWindow('更新', 'update', 490, 335, '', false, 490, 335, false, true)
+    const closeWindow = await WebviewWindow.getByLabel(event.close)
+    closeWindow?.close()
+  })
 })
 
 onUnmounted(() => {
@@ -146,5 +158,17 @@ onUnmounted(() => {
 .n-base-select-menu .n-base-select-option::before {
   border-radius: 8px;
   font-size: 12px;
+}
+
+img {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+button,
+a {
+  user-select: auto;
+  cursor: auto;
 }
 </style>

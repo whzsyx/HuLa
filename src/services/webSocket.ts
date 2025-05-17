@@ -20,6 +20,11 @@ const worker: Worker = new Worker(new URL('../workers/webSocket.worker.ts', impo
   type: 'module'
 })
 
+// 创建 timer worker
+const timerWorker: Worker = new Worker(new URL('../workers/timer.worker.ts', import.meta.url), {
+  type: 'module'
+})
+
 // 添加一个标识是否是主窗口的变量
 let isMainWindow = false
 
@@ -40,8 +45,30 @@ class WS {
     this.initWindowType()
     if (isMainWindow) {
       this.initConnect()
-      // 收到消息
+      // 收到WebSocket worker消息
       worker.addEventListener('message', this.onWorkerMsg)
+      // 收到Timer worker消息
+      timerWorker.addEventListener('message', this.onTimerWorkerMsg)
+    }
+  }
+
+  // 处理Timer worker消息
+  onTimerWorkerMsg = (e: MessageEvent<any>) => {
+    const data = e.data
+    switch (data.type) {
+      case 'timeout': {
+        // 检查是否是心跳超时消息
+        if (data.msgId && data.msgId.startsWith('heartbeat_timeout_')) {
+          // 转发给WebSocket worker
+          worker.postMessage(JSON.stringify({ type: 'heartbeatTimeout' }))
+        }
+        break
+      }
+      case 'periodicHeartbeat': {
+        // 心跳触发，转发给WebSocket worker
+        worker.postMessage(JSON.stringify({ type: 'heartbeatTimerTick' }))
+        break
+      }
     }
   }
 
@@ -83,9 +110,18 @@ class WS {
       localStorage.removeItem('user')
     }
     const clientId = await getEnhancedFingerprint()
+    const savedProxy = localStorage.getItem('proxySettings')
+    let serverUrl = import.meta.env.VITE_WEBSOCKET_URL
+    if (savedProxy) {
+      const settings = JSON.parse(savedProxy)
+      const suffix = settings.wsIp + ':' + settings.wsPort + '/' + settings.wsSuffix
+      if (settings.wsType === 'ws' || settings.wsType === 'wss') {
+        serverUrl = settings.wsType + '://' + suffix
+      }
+    }
     // 初始化 ws
     worker.postMessage(
-      `{"type":"initWS","value":{"token":${token ? `"${token}"` : null},"clientId":${clientId ? `"${clientId}"` : null}}}`
+      `{"type":"initWS","value":{"token":${token ? `"${token}"` : null},"clientId":${clientId ? `"${clientId}", "serverUrl":"${serverUrl}"` : null}}}`
     )
   }
 
@@ -114,10 +150,46 @@ class WS {
         useMitt.emit(WsResponseMessageType.NO_INTERNET, params.value)
         // 如果是重连失败，可以提示用户刷新页面
         if ((params.value as { msg: string }).msg.includes('连接失败次数过多')) {
+          useMitt.emit('showMainMessage', { title: '连接断开', content: '连接已断开，请刷新页面或重新登录。' })
           // 可以触发UI提示，让用户刷新页面
-          // TODO: 无感帮助用户刷新页面
           useMitt.emit('wsReconnectFailed', params.value)
         }
+        break
+      }
+      // 心跳定时器相关消息处理
+      case 'startHeartbeatTimer': {
+        // 启动心跳定时器
+        const { interval } = params.value as { interval: number }
+        timerWorker.postMessage({
+          type: 'startPeriodicHeartbeat',
+          interval
+        })
+        break
+      }
+      case 'stopHeartbeatTimer': {
+        // 停止心跳定时器
+        timerWorker.postMessage({
+          type: 'stopPeriodicHeartbeat'
+        })
+        break
+      }
+      case 'startHeartbeatTimeoutTimer': {
+        // 启动心跳超时定时器
+        const { timerId, timeout } = params.value as { timerId: string; timeout: number }
+        timerWorker.postMessage({
+          type: 'startTimer',
+          msgId: timerId,
+          duration: timeout
+        })
+        break
+      }
+      case 'clearHeartbeatTimeoutTimer': {
+        // 清除心跳超时定时器
+        const { timerId } = params.value as { timerId: string }
+        timerWorker.postMessage({
+          type: 'clearTimer',
+          msgId: timerId
+        })
         break
       }
       case 'connectionStateChange': {
@@ -242,9 +314,8 @@ class WS {
           useMitt.emit(WsResponseMessageType.INVALID_USER, params.data as { uid: number })
           break
         }
-        // 点赞、倒赞消息通知
+        // 点赞、不满消息通知
         case WsResponseMessageType.MSG_MARK_ITEM: {
-          console.log('点赞')
           useMitt.emit(WsResponseMessageType.MSG_MARK_ITEM, params.data as { markList: MarkItemType[] })
           break
         }
@@ -299,6 +370,47 @@ class WS {
           )
           break
         }
+        case WsResponseMessageType.ROOM_INFO_CHANGE: {
+          console.log('群主修改群聊信息', params.data)
+          useMitt.emit(
+            WsResponseMessageType.ROOM_INFO_CHANGE,
+            params.data as {
+              roomId: string
+              name: string
+              avatar: string
+            }
+          )
+          break
+        }
+        case WsResponseMessageType.ROOM_GROUP_NOTICE_MSG: {
+          console.log('发布群公告', params.data)
+          useMitt.emit(
+            WsResponseMessageType.ROOM_GROUP_NOTICE_MSG,
+            params.data as {
+              id: string
+              content: string
+              top: string
+            }
+          )
+          break
+        }
+        case WsResponseMessageType.ROOM_EDIT_GROUP_NOTICE_MSG: {
+          console.log('编辑群公告', params.data)
+          useMitt.emit(
+            WsResponseMessageType.ROOM_EDIT_GROUP_NOTICE_MSG,
+            params.data as {
+              id: string
+              content: string
+              top: string
+            }
+          )
+          break
+        }
+        case WsResponseMessageType.ROOM_DISSOLUTION: {
+          console.log('群解散', params.data)
+          useMitt.emit(WsResponseMessageType.ROOM_DISSOLUTION, params.data)
+          break
+        }
         default: {
           console.log('接收到未处理类型的消息:', params)
           break
@@ -335,6 +447,10 @@ class WS {
   destroy() {
     worker.postMessage(JSON.stringify({ type: 'clearReconnectTimer' }))
     worker.terminate()
+    // 同时终止timer worker相关的心跳
+    timerWorker.postMessage({
+      type: 'stopPeriodicHeartbeat'
+    })
     this.#tasks = []
     this.#processedMsgCache.clear()
     this.#connectReady = false

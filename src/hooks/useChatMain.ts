@@ -288,8 +288,17 @@ export const useChatMain = () => {
         const targetUid = item.uid || item.fromUser?.uid
         if (!targetUid) return false
 
-        // 4. 检查目标用户是否已经是管理员或群主
-        if (item.roleId === RoleEnum.ADMIN || item.roleId === RoleEnum.LORD) return false
+        // 4. 检查目标用户角色
+        let targetRoleId = item.roleId
+
+        // 如果item中没有roleId，则通过uid从群成员列表中查找
+        if (targetRoleId === void 0) {
+          const targetUser = groupStore.userList.find((user) => user.uid === targetUid)
+          targetRoleId = targetUser?.roleId
+        }
+
+        // 检查目标用户是否已经是管理员或群主
+        if (targetRoleId === RoleEnum.ADMIN || targetRoleId === RoleEnum.LORD) return false
 
         // 5. 检查当前用户是否是群主
         const currentUser = groupStore.userList.find((user) => user.uid === userUid.value)
@@ -324,8 +333,17 @@ export const useChatMain = () => {
         const targetUid = item.uid || item.fromUser?.uid
         if (!targetUid) return false
 
-        // 4. 检查目标用户是否是管理员(只能撤销管理员,不能撤销群主)
-        if (item.roleId !== RoleEnum.ADMIN) return false
+        // 4. 检查目标用户角色
+        let targetRoleId = item.roleId
+
+        // 如果item中没有roleId，则通过uid从群成员列表中查找
+        if (targetRoleId === void 0) {
+          const targetUser = groupStore.userList.find((user) => user.uid === targetUid)
+          targetRoleId = targetUser?.roleId
+        }
+
+        // 检查目标用户是否是管理员(只能撤销管理员,不能撤销群主)
+        if (targetRoleId !== RoleEnum.ADMIN) return false
 
         // 5. 检查当前用户是否是群主
         const currentUser = groupStore.userList.find((user) => user.uid === userUid.value)
@@ -365,8 +383,17 @@ export const useChatMain = () => {
         const targetUid = item.uid || item.fromUser?.uid
         if (!targetUid) return false
 
-        // 4. 检查目标用户是否是群主(群主不能被移出)
-        if (item.roleId === RoleEnum.LORD) return false
+        // 4. 检查目标用户角色
+        let targetRoleId = item.roleId
+
+        // 如果item中没有roleId，则通过uid从群成员列表中查找
+        if (targetRoleId === void 0) {
+          const targetUser = groupStore.userList.find((user) => user.uid === targetUid)
+          targetRoleId = targetUser?.roleId
+        }
+
+        // 检查目标用户是否是群主(群主不能被移出)
+        if (targetRoleId === RoleEnum.LORD) return false
 
         // 5. 检查当前用户是否有权限(群主或管理员)
         const currentUser = groupStore.userList.find((user) => user.uid === userUid.value)
@@ -374,7 +401,7 @@ export const useChatMain = () => {
         const isAdmin = currentUser?.roleId === RoleEnum.ADMIN
 
         // 6. 如果当前用户是管理员,则不能移出其他管理员
-        if (isAdmin && item.roleId === RoleEnum.ADMIN) return false
+        if (isAdmin && targetRoleId === RoleEnum.ADMIN) return false
 
         return isLord || isAdmin
       }
@@ -388,20 +415,74 @@ export const useChatMain = () => {
   /** emoji表情菜单 */
   const emojiList = ref([
     {
-      label: '👍',
+      url: '/msgAction/like.png',
+      value: 1,
       title: '好赞'
     },
     {
-      label: '😆',
-      title: '开心'
+      url: '/msgAction/slightly-frowning-face.png',
+      value: 2,
+      title: '不满'
     },
     {
-      label: '🥳',
-      title: '恭喜'
+      url: '/msgAction/heart-on-fire.png',
+      value: 3,
+      title: '爱心'
     },
     {
-      label: '🤯',
-      title: '惊呆了'
+      url: '/msgAction/enraged-face.png',
+      value: 4,
+      title: '愤怒'
+    },
+    {
+      url: '/emoji/party-popper.webp',
+      value: 5,
+      title: '礼炮'
+    },
+    {
+      url: '/emoji/rocket.webp',
+      value: 6,
+      title: '火箭'
+    },
+    {
+      url: '/msgAction/face-with-tears-of-joy.png',
+      value: 7,
+      title: '笑哭'
+    },
+    {
+      url: '/msgAction/clapping.png',
+      value: 8,
+      title: '鼓掌'
+    },
+    {
+      url: '/msgAction/rose.png',
+      value: 9,
+      title: '鲜花'
+    },
+    {
+      url: '/msgAction/bomb.png',
+      value: 10,
+      title: '炸弹'
+    },
+    {
+      url: '/msgAction/exploding-head.png',
+      value: 11,
+      title: '疑问'
+    },
+    {
+      url: '/msgAction/victory-hand.png',
+      value: 12,
+      title: '胜利'
+    },
+    {
+      url: '/msgAction/flashlight.png',
+      value: 13,
+      title: '灯光'
+    },
+    {
+      url: '/msgAction/pocket-money.png',
+      value: 14,
+      title: '红包'
     }
   ])
 

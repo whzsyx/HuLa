@@ -3,9 +3,10 @@
 mod desktops;
 #[cfg(desktop)]
 use common_cmd::{
-    audio, default_window_icon, screenshot, set_badge_count,
-    set_height,
+    audio, default_window_icon, screenshot, set_badge_count, set_height,
 };
+#[cfg(target_os = "macos")]
+use common_cmd::{hide_title_bar_buttons};
 #[cfg(desktop)]
 mod proxy;
 #[cfg(desktop)]
@@ -17,7 +18,9 @@ use desktops::tray;
 #[cfg(desktop)]
 use init::CustomInit;
 #[cfg(desktop)]
-use proxy::test_proxy;
+use proxy::test_api_proxy;
+#[cfg(desktop)]
+use proxy::test_ws_proxy;
 
 // 移动端依赖
 #[cfg(mobile)]
@@ -54,7 +57,10 @@ fn setup_desktop() {
             audio,
             set_height,
             set_badge_count,
-            test_proxy
+            test_api_proxy,
+            test_ws_proxy,
+            #[cfg(target_os = "macos")]
+            hide_title_bar_buttons
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

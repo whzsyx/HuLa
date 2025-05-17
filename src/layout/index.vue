@@ -45,6 +45,8 @@ import { useCachedStore } from '@/stores/cached'
 import { clearListener, initListener, readCountQueue } from '@/utils/ReadCountQueue'
 import { type } from '@tauri-apps/plugin-os'
 import { useConfigStore } from '@/stores/config'
+import { useCheckUpdate } from '@/hooks/useCheckUpdate'
+import { UserAttentionType } from '@tauri-apps/api/window'
 
 const loadingPercentage = ref(10)
 const loadingText = ref('正在加载应用...')
@@ -99,10 +101,27 @@ const userStore = useUserStore()
 const chatStore = useChatStore()
 const cachedStore = useCachedStore()
 const configStore = useConfigStore()
+const { checkUpdate, CHECK_UPDATE_TIME } = useCheckUpdate()
 const userUid = computed(() => userStore.userInfo.uid)
 // 清空未读消息
 // globalStore.unReadMark.newMsgUnreadCount = 0
 const shrinkStatus = ref(false)
+
+// 导入Web Worker
+const timerWorker = new Worker(new URL('../workers/timer.worker.ts', import.meta.url))
+
+// 添加错误处理
+timerWorker.onerror = (error) => {
+  console.error('[Worker Error]', error)
+}
+
+// 监听 Worker 消息
+timerWorker.onmessage = (e) => {
+  const { type } = e.data
+  if (type === 'timeout') {
+    checkUpdate('home')
+  }
+}
 
 watch(
   () => userStore.isSign,
@@ -168,11 +187,11 @@ useMitt.on(WsResponseMessageType.ONLINE, async (onStatusChangeType: OnStatusChan
   }
 })
 useMitt.on(WsResponseMessageType.TOKEN_EXPIRED, async (wsTokenExpire: WsTokenExpire) => {
-  if (Number(userUid) === Number(wsTokenExpire.uid) && userStore.userInfo.client === wsTokenExpire.client) {
+  if (Number(userUid.value) === Number(wsTokenExpire.uid) && userStore.userInfo.client === wsTokenExpire.client) {
+    console.log('收到用户token过期通知', wsTokenExpire)
     // 聚焦主窗口
     const home = await WebviewWindow.getByLabel('home')
     await home?.setFocus()
-    console.log('账号在其他设备登录', wsTokenExpire)
     useMitt.emit(MittEnum.LEFT_MODAL_SHOW, {
       type: ModalEnum.REMOTE_LOGIN,
       props: {
@@ -189,8 +208,16 @@ useMitt.on(WsResponseMessageType.INVALID_USER, (param: { uid: string }) => {
   // 群成员列表删掉拉黑的用户
   groupStore.filterUser(data.uid)
 })
-useMitt.on(WsResponseMessageType.MSG_MARK_ITEM, (markList: MarkItemType[]) => {
-  chatStore.updateMarkCount(markList)
+useMitt.on(WsResponseMessageType.MSG_MARK_ITEM, (data: { markList: MarkItemType[] }) => {
+  console.log('收到消息标记更新:', data)
+
+  // 确保data.markList是一个数组再传递给updateMarkCount
+  if (data && data.markList && Array.isArray(data.markList)) {
+    chatStore.updateMarkCount(data.markList)
+  } else if (data && !Array.isArray(data)) {
+    // 兼容处理：如果直接收到了单个MarkItemType对象
+    chatStore.updateMarkCount([data as unknown as MarkItemType])
+  }
 })
 useMitt.on(WsResponseMessageType.MSG_RECALL, (data: RevokedMsgType) => {
   chatStore.updateRecallStatus(data)
@@ -205,28 +232,30 @@ useMitt.on(WsResponseMessageType.MY_ROOM_INFO_CHANGE, (data: { myName: string; r
 })
 useMitt.on(WsResponseMessageType.RECEIVE_MESSAGE, async (data: MessageType) => {
   chatStore.pushMsg(data)
-  if (data.fromUser.uid !== userUid.value) {
-    useMitt.emit(MittEnum.MESSAGE_ANIMATION, data)
-  }
-  // 接收到通知就设置图标闪烁
   const username = useUserInfo(data.fromUser.uid).value.name!
+  const home = await WebviewWindow.getByLabel('home')
+  // 当home窗口不显示并且home窗口不是最小化的时候并且不是聚焦窗口的时候
+  const homeShow = await home?.isVisible()
+  const isHomeMinimized = await home?.isMinimized()
+  const isHomeFocused = await home?.isFocused()
+  if (homeShow && !isHomeMinimized && isHomeFocused) return
+
   // 不是自己发的消息才通知
   if (data.fromUser.uid !== userUid.value) {
-    // 在windows系统下才发送通知
-    if (type() === 'windows') {
-      await emitTo('tray', 'show_tip')
-    }
-
-    // 判断主窗口是否是在其他窗口的前面并且聚焦
-    const home = await WebviewWindow.getByLabel('home')
-    // 是否在其他窗口的前面
-    const isVisible = await home?.isVisible()
-
     // 获取该消息的会话信息
     const session = chatStore.sessionList.find((s) => s.roomId === data.message.roomId)
 
-    // 只有非免打扰的会话才发送通知
-    if (session && isVisible && session.muteNotification !== NotificationTypeEnum.NOT_DISTURB) {
+    // 只有非免打扰的会话才发送通知和触发图标闪烁
+    if (session && session.muteNotification !== NotificationTypeEnum.NOT_DISTURB) {
+      // 设置图标闪烁
+      useMitt.emit(MittEnum.MESSAGE_ANIMATION, data)
+      // 在windows系统下才发送通知
+      if (type() === 'windows') {
+        await emitTo('tray', 'show_tip')
+        // 请求用户注意窗口
+        home?.requestUserAttention(UserAttentionType.Critical)
+      }
+
       await emitTo('notify', 'notify_cotent', data)
       const throttleSendNotification = useThrottleFn(() => {
         sendNotification({
@@ -279,6 +308,26 @@ useMitt.on(WsResponseMessageType.REQUEST_APPROVAL_FRIEND, async () => {
   // 刷新好友列表以获取最新状态
   await contactStore.getContactList(true)
 })
+useMitt.on(WsResponseMessageType.ROOM_INFO_CHANGE, async (data: { roomId: string; name: string; avatar: string }) => {
+  // 根据roomId修改对应房间中的群名称和群头像
+  const { roomId, name, avatar } = data
+
+  // 更新chatStore中的会话信息
+  chatStore.updateSession(roomId, {
+    name,
+    avatar
+  })
+
+  // 如果当前正在查看的是该群聊，则需要刷新群组详情
+  if (globalStore.currentSession?.roomId === roomId && globalStore.currentSession.type === RoomTypeEnum.GROUP) {
+    // 重新获取群组信息统计
+    await groupStore.getCountStatistic()
+  }
+})
+useMitt.on(WsResponseMessageType.ROOM_DISSOLUTION, async () => {
+  // 刷新群聊列表
+  await contactStore.getGroupChatList()
+})
 
 onBeforeMount(async () => {
   // 默认执行一次
@@ -300,9 +349,33 @@ onMounted(async () => {
     const permission = await requestPermission()
     permissionGranted = permission === 'granted'
   }
+  timerWorker.postMessage({
+    type: 'startTimer',
+    msgId: 'checkUpdate',
+    duration: CHECK_UPDATE_TIME
+  })
+
+  // 监听home窗口被聚焦的事件，当窗口被聚焦时自动关闭状态栏通知
+  const homeWindow = await WebviewWindow.getByLabel('home')
+  if (homeWindow) {
+    homeWindow.onFocusChanged(({ payload: focused }) => {
+      // 当窗口获得焦点时，关闭通知提示
+      if (focused) {
+        globalStore.setTipVisible(false)
+        // 同时通知通知窗口隐藏
+        emitTo('notify', 'hide_notify')
+      }
+    })
+  }
 })
 
 onUnmounted(() => {
   clearListener()
+  // 清除Web Worker计时器
+  timerWorker.postMessage({
+    type: 'clearTimer',
+    msgId: 'checkUpdate'
+  })
+  timerWorker.terminate()
 })
 </script>
