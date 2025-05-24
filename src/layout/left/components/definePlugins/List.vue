@@ -7,7 +7,7 @@
       max-height="280px"
       style-id="plugins-hover-classes">
       <template #item="{ item: plugin, index }">
-        <n-flex align="center" justify="space-between" class="p-[0_20px] mt-10px">
+        <n-flex align="center" justify="space-between" class="p-[10px_20px] mt-10px">
           <n-flex :size="14" align="center">
             <n-flex align="center" justify="center" class="size-48px rounded-50% bg-#7676760f">
               <Transition mode="out-in">
@@ -68,7 +68,7 @@
               @click="handleState(plugin)"
               align="center"
               class="relative"
-              :class="[plugin.state === PluginEnum.DOWNLOADING ? 'downloading' : 'bg-[--primary-color] size-full']">
+              :class="[plugin.state === PluginEnum.DOWNLOADING ? 'downloading' : 'size-full']">
               <div
                 :style="{
                   width: plugin.state === PluginEnum.DOWNLOADING ? `${plugin.progress * 0.6}px` : 'auto'
@@ -139,6 +139,7 @@ const pluginsStore = usePluginsStore()
 const { plugins } = storeToRefs(pluginsStore)
 const isCurrently = ref(-1)
 const allPlugins = ref([] as STO.Plugins<PluginEnum>[])
+const pluginsLists = ref<STO.Plugins<PluginEnum>[]>(JSON.parse(JSON.stringify(pluginsList.value)))
 
 const handleState = (plugin: STO.Plugins<PluginEnum>) => {
   if (plugin.state === PluginEnum.INSTALLED) return
@@ -195,7 +196,7 @@ const closeMenu = (event: Event) => {
 }
 
 onMounted(() => {
-  allPlugins.value = pluginsList.value.map((i) => {
+  allPlugins.value = pluginsLists.value.map((i) => {
     const p = plugins.value.find((z) => z.title === i.title)
     return p
       ? {

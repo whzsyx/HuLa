@@ -59,14 +59,19 @@ const routes: Array<RouteRecordRaw> = [
     component: () => import('@/views/registerWindow/index.vue')
   },
   {
+    path: '/forgetPassword',
+    name: 'forgetPassword',
+    component: () => import('@/views/forgetPasswordWindow/index.vue')
+  },
+  {
     path: '/qrCode',
     name: 'qrCode',
     component: () => import('@/views/loginWindow/QRCode.vue')
   },
   {
-    path: '/proxy',
-    name: 'proxy',
-    component: () => import('@/views/loginWindow/Proxy.vue')
+    path: '/network',
+    name: 'network',
+    component: () => import('@/views/loginWindow/Network.vue')
   },
   {
     path: '/tray',
@@ -77,6 +82,16 @@ const routes: Array<RouteRecordRaw> = [
     path: '/notify',
     name: 'notify',
     component: () => import('@/views/Notify.vue')
+  },
+  {
+    path: '/update',
+    name: 'update',
+    component: () => import('@/views/Update.vue')
+  },
+  {
+    path: '/checkupdate',
+    name: 'checkupdate',
+    component: () => import('@/views/CheckUpdate.vue')
   },
   {
     path: '/capture',
@@ -186,6 +201,11 @@ const routes: Array<RouteRecordRaw> = [
     component: () => import('@/views/homeWindow/SharedScreen.vue')
   },
   {
+    path: '/modal-invite',
+    name: 'modal-invite',
+    component: () => import('@/views/modalWindow/index.vue')
+  },
+  {
     path: '/settings',
     name: 'settings',
     component: () => import('@/views/moreWindow/settings/index.vue'),
@@ -206,6 +226,11 @@ const routes: Array<RouteRecordRaw> = [
         component: () => import('@/views/moreWindow/settings/Versatile.vue')
       }
     ]
+  },
+  {
+    path: '/announList/:roomId/:type',
+    name: 'announList',
+    component: () => import('@/views/announWindow/index.vue')
   }
 ]
 

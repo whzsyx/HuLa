@@ -7,6 +7,7 @@ import { parseInnerText, useCommon } from '@/hooks/useCommon.ts'
 import { BaseDirectory, readFile } from '@tauri-apps/plugin-fs'
 import DOMPurify from 'dompurify'
 import { useUpload, UploadProviderEnum, UploadOptions } from '@/hooks/useUpload'
+import { getImageDimensions } from '@/utils/imageUtils'
 
 interface MessageStrategy {
   getMsg: (msgInputValue: string, replyValue: any, fileList?: File[]) => any
@@ -45,12 +46,7 @@ abstract class AbstractMessageStrategy implements MessageStrategy {
         status: MessageStatusEnum.PENDING,
         type: this.msgType,
         body: messageBody,
-        messageMark: {
-          userLike: 0,
-          userDislike: 0,
-          likeCount: 0,
-          dislikeCount: 0
-        }
+        messageMarks: {}
       },
       sendTime: new Date(currentTime).toISOString(),
       loading: false
@@ -85,9 +81,16 @@ class TextMessageStrategyImpl extends AbstractMessageStrategy {
 
   getMsg(msgInputValue: string, replyValue: any): any {
     const { removeTag } = useCommon()
+
+    // 处理&nbsp;为空格
+    let content = removeTag(msgInputValue)
+    if (content && typeof content === 'string') {
+      content = content.replace(/&nbsp;/g, ' ')
+    }
+
     const msg = {
       type: this.msgType,
-      content: removeTag(msgInputValue),
+      content: content,
       reply: replyValue.content
         ? {
             content: replyValue.content,
@@ -104,8 +107,9 @@ class TextMessageStrategyImpl extends AbstractMessageStrategy {
         replyDiv.parentNode?.removeChild(replyDiv)
       }
       tempDiv.innerHTML = DOMPurify.sanitize(removeTag(tempDiv.innerHTML))
-      tempDiv.innerHTML = tempDiv.innerHTML.replace(/^\s*&nbsp;/, '')
-      msg.content = tempDiv.innerHTML
+
+      // 确保所有的&nbsp;都被替换为空格
+      msg.content = tempDiv.innerHTML.replace(/&nbsp;/g, ' ')
     }
     // 验证消息长度
     if (msg.content.length > 500) {
@@ -166,26 +170,17 @@ class ImageMessageStrategyImpl extends AbstractMessageStrategy {
    * @param file 图片文件
    * @returns 图片信息
    */
-  private getImageInfo(file: File): Promise<{ width: number; height: number; previewUrl: string }> {
-    return new Promise((resolve, reject) => {
-      const img = new Image()
-      const previewUrl = URL.createObjectURL(file)
-
-      img.onload = () => {
-        resolve({
-          width: img.width,
-          height: img.height,
-          previewUrl
-        })
+  private async getImageInfo(file: File): Promise<{ width: number; height: number; previewUrl: string }> {
+    try {
+      const result = await getImageDimensions(file, { includePreviewUrl: true })
+      return {
+        width: result.width,
+        height: result.height,
+        previewUrl: result.previewUrl!
       }
-
-      img.onerror = () => {
-        URL.revokeObjectURL(previewUrl)
-        reject(new AppException('图片加载失败'))
-      }
-
-      img.src = previewUrl
-    })
+    } catch (error) {
+      throw new AppException('图片加载失败')
+    }
   }
 
   /**
@@ -209,38 +204,17 @@ class ImageMessageStrategyImpl extends AbstractMessageStrategy {
    * @param url 图片地址
    * @returns 图片信息
    */
-  private getRemoteImageInfo(url: string): Promise<{ width: number; height: number; size: number }> {
-    return new Promise((resolve, reject) => {
-      const img = new Image()
-      img.crossOrigin = 'anonymous' // 处理跨域问题
-
-      img.onload = async () => {
-        try {
-          // 获取图片大小
-          const response = await fetch(url, { method: 'HEAD' })
-          const size = parseInt(response.headers.get('content-length') || '0')
-
-          resolve({
-            width: img.width,
-            height: img.height,
-            size: size
-          })
-        } catch (error) {
-          // 如果无法获取大小，使用默认值
-          resolve({
-            width: img.width,
-            height: img.height,
-            size: 0
-          })
-        }
+  private async getRemoteImageInfo(url: string): Promise<{ width: number; height: number; size: number }> {
+    try {
+      const result = await getImageDimensions(url, { includeSize: true })
+      return {
+        width: result.width,
+        height: result.height,
+        size: result.size || 0
       }
-
-      img.onerror = () => {
-        reject(new AppException('图片加载失败'))
-      }
-
-      img.src = url
-    })
+    } catch (error) {
+      throw new AppException('图片加载失败')
+    }
   }
 
   /**
@@ -301,7 +275,7 @@ class ImageMessageStrategyImpl extends AbstractMessageStrategy {
       const fileType = this.getFileType(fileName)
 
       // 创建文件对象
-      const originalFile = new File([fileData], fileName, {
+      const originalFile = new File([new Uint8Array(fileData)], fileName, {
         type: fileType
       })
 
@@ -586,6 +560,8 @@ export const messageStrategyMap: Record<MsgEnum, MessageStrategy> = {
   [MsgEnum.FILE]: fileMessageStrategy,
   [MsgEnum.IMAGE]: imageMessageStrategy,
   [MsgEnum.TEXT]: textMessageStrategy,
+  [MsgEnum.NOTICE]: unsupportedMessageStrategy,
+  [MsgEnum.MERGE]: unsupportedMessageStrategy,
   [MsgEnum.EMOJI]: emojiMessageStrategy,
   [MsgEnum.UNKNOWN]: unsupportedMessageStrategy,
   [MsgEnum.RECALL]: unsupportedMessageStrategy,

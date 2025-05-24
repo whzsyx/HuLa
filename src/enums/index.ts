@@ -93,7 +93,13 @@ export enum MittEnum {
   /** 消息动画 */
   MESSAGE_ANIMATION = 'messageAnimation',
   /** 聊天框滚动到底部 */
-  CHAT_SCROLL_BOTTOM = 'CHAT_SCROLL_BOTTOM'
+  CHAT_SCROLL_BOTTOM = 'CHAT_SCROLL_BOTTOM',
+  /** 创建群聊 */
+  CREATE_GROUP = 'createGroup',
+  /** 更新提示 */
+  CHECK_UPDATE = 'checkUpdate',
+  /** 强制更新 */
+  DO_UPDATE = 'doUpdate'
 }
 
 /** 主题类型 */
@@ -169,6 +175,10 @@ export enum MsgEnum {
   EMOJI,
   /** 系统消息 */
   SYSTEM,
+  /** 合并消息 */
+  MERGE,
+  /** 公告 */
+  NOTICE,
   /** 混合 */
   MIXED,
   /** 艾特 */
@@ -224,8 +234,34 @@ export enum IsYesEnum {
 }
 
 export enum MarkEnum {
+  /** 点赞 */
   LIKE = 1,
-  DISLIKE
+  /** 不满 */
+  DISLIKE,
+  /** 爱心 */
+  HEART,
+  /** 愤怒 */
+  ANGRY,
+  /** 礼炮 */
+  CELEBRATE,
+  /** 火箭 */
+  ROCKET,
+  /** 笑哭 */
+  LOL,
+  /** 鼓掌 */
+  APPLAUSE,
+  /** 鲜花 */
+  FLOWER,
+  /** 炸弹 */
+  BOMB,
+  /** 疑问 */
+  CONFUSED,
+  /** 胜利 */
+  VICTORY,
+  /** 灯光 */
+  LIGHT,
+  /** 红包 */
+  MONEY
 }
 
 // 成员角色 1群主 2管理员 3普通成员 4踢出群聊

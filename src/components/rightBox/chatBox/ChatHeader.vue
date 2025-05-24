@@ -83,12 +83,13 @@
         </n-popover>
       </div>
 
-      <div class="options-box">
+      <div v-if="activeItem.roomId !== '1'" class="options-box" @click="handleCreateGroupOrInvite">
         <n-popover trigger="hover" :show-arrow="false" placement="bottom">
           <template #trigger>
             <svg><use href="#launch"></use></svg>
           </template>
-          <span>发起群聊</span>
+          <span v-if="activeItem.type === RoomTypeEnum.GROUP">邀请进群</span>
+          <span v-else>发起群聊</span>
         </n-popover>
       </div>
 
@@ -153,40 +154,61 @@
                   <n-avatar v-else round :size="40" :src="AvatarUtils.getAvatarUrl(activeItem.avatar)" />
                 </div>
 
-                <!-- 群名称 -->
-                <n-flex :size="10" align="center">
-                  <div v-if="isGroupOwner && isEditingGroupName" class="flex-1">
-                    <n-input
-                      ref="groupNameInputRef"
-                      v-model:value="editingGroupName"
-                      @blur="saveGroupName"
-                      @keydown.enter="saveGroupName"
-                      size="small"
-                      maxlength="12"
-                      class="border-(solid 1px [--line-color])"
-                      placeholder="请输入群名称(最多12字)" />
-                  </div>
-                  <div
-                    v-else
-                    class="text-(14px --text-color) cursor-default"
-                    :class="{ 'cursor-pointer': isGroupOwner }"
-                    @click="isGroupOwner && startEditGroupName()">
-                    {{ activeItem.name }}
-                    <!-- 显示编辑图标 -->
-                    <svg v-if="isGroupOwner" class="size-14px ml-1 inline-block color-[--icon-color]">
-                      <use href="#edit"></use>
-                    </svg>
-                  </div>
-                </n-flex>
+                <n-flex vertical :size="6">
+                  <!-- 群名称 -->
+                  <n-flex :size="10" align="center">
+                    <div v-if="isGroupOwner && isEditingGroupName" class="flex-1">
+                      <n-input
+                        ref="groupNameInputRef"
+                        v-model:value="editingGroupName"
+                        @blur="saveGroupName"
+                        @keydown.enter="saveGroupName"
+                        size="tiny"
+                        maxlength="12"
+                        class="border-(solid 1px [--line-color])"
+                        placeholder="请输入群名称(最多12字)" />
+                    </div>
+                    <div
+                      v-else
+                      class="text-(14px --text-color) cursor-default"
+                      :class="{ 'cursor-pointer': isGroupOwner }"
+                      @click="isGroupOwner && startEditGroupName()">
+                      {{ activeItem.name }}
+                      <!-- 显示编辑图标 -->
+                      <svg v-if="isGroupOwner" class="size-14px ml-1 inline-block color-[--icon-color]">
+                        <use href="#edit"></use>
+                      </svg>
+                    </div>
 
-                <n-popover trigger="hover" v-if="activeItem.hotFlag === IsAllUserEnum.Yes && !isEditingGroupName">
-                  <template #trigger>
-                    <svg class="size-20px select-none outline-none cursor-pointer color-#13987f">
-                      <use href="#auth"></use>
-                    </svg>
-                  </template>
-                  <span>官方群聊认证</span>
-                </n-popover>
+                    <n-popover trigger="hover" v-if="activeItem.hotFlag === IsAllUserEnum.Yes && !isEditingGroupName">
+                      <template #trigger>
+                        <svg class="size-20px select-none outline-none cursor-pointer color-#13987f">
+                          <use href="#auth"></use>
+                        </svg>
+                      </template>
+                      <span>官方群聊认证</span>
+                    </n-popover>
+                  </n-flex>
+
+                  <n-flex align="center" :size="8">
+                    <!-- hula号 -->
+                    <p
+                      class="text-(12px center [--chat-text-color]) rounded-4px w-100px py-2px bg-[#e3e3e3] dark:bg-[#505050]">
+                      {{ activeItem.account }}
+                    </p>
+
+                    <n-tooltip trigger="hover">
+                      <template #trigger>
+                        <svg
+                          class="size-12px cursor-pointer hover:color-#909090 hover:transition-colors"
+                          @click="handleCopy">
+                          <use href="#copy"></use>
+                        </svg>
+                      </template>
+                      <span>复制</span>
+                    </n-tooltip>
+                  </n-flex>
+                </n-flex>
               </n-flex>
             </div>
 
@@ -210,13 +232,16 @@
             </div>
 
             <!-- 我本群的昵称 -->
-            <p class="text-(12px #909090) mt-20px mb-10px">我本群的昵称</p>
+            <p class="text-(12px [--chat-text-color]) mt-20px mb-10px">我本群的昵称</p>
             <n-input
               class="border-(solid 1px [--line-color]) custom-shadow"
               v-model:value="groupDetail.myNickname"
               @update:value="updateGroupInfo($event, 'nickname')" />
             <!-- 群备注 -->
-            <p class="text-(12px #909090) mt-20px mb-10px">群备注</p>
+            <p class="flex-start-center gap-10px text-(12px [--chat-text-color]) mt-20px mb-10px">
+              群备注
+              <span class="text-(10px #909090)">(群备注仅自己可见)</span>
+            </p>
             <n-input
               class="border-(solid 1px [--line-color]) custom-shadow"
               v-model:value="groupDetail.groupRemark"
@@ -241,12 +266,21 @@
                     :value="activeItem.muteNotification === NotificationTypeEnum.NOT_DISTURB"
                     @update:value="handleNotification" />
                 </div>
+              </n-flex>
+            </div>
 
-                <div class="h-1px bg-[--setting-item-line] m-[10px_0]"></div>
+            <!-- 群消息设置（仅在消息免打扰开启时显示） -->
+            <div
+              v-if="activeItem.muteNotification === NotificationTypeEnum.NOT_DISTURB"
+              class="box-item cursor-default">
+              <n-flex vertical justify="center" :size="4">
+                <p class="text-(12px #909090) pb-14px">群消息设置</p>
 
                 <div class="flex-between-center">
-                  <p>屏蔽群消息</p>
-                  <n-switch size="small" :value="activeItem.shield" @update:value="handleShield" />
+                  <n-select
+                    v-model:value="messageSettingType"
+                    :options="messageSettingOptions"
+                    @update:value="handleMessageSetting" />
                 </div>
               </n-flex>
             </div>
@@ -331,24 +365,30 @@ import { AvatarUtils } from '@/utils/AvatarUtils'
 import { OnlineEnum } from '@/enums'
 import { useTauriListener } from '@/hooks/useTauriListener'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { RoomTypeEnum, SessionOperateEnum } from '@/enums'
+import { RoomTypeEnum, SessionOperateEnum, RoleEnum } from '@/enums'
 import { useMitt } from '@/hooks/useMitt.ts'
 import { useUserStatusStore } from '@/stores/userStatus'
+import { useUserStore } from '@/stores/user.ts'
 import apis from '@/services/apis'
 import AvatarCropper from '@/components/common/AvatarCropper.vue'
 import { useAvatarUpload } from '@/hooks/useAvatarUpload'
+import { useWindow } from '@/hooks/useWindow'
+import { useGlobalStore } from '@/stores/global'
 
 const appWindow = WebviewWindow.getCurrent()
 const { activeItem } = defineProps<{
   activeItem: SessionItem
 }>()
+const { createModalWindow } = useWindow()
 const { addListener } = useTauriListener()
 // 使用useDisplayMedia获取屏幕共享的媒体流
 const { stream, start, stop } = useDisplayMedia()
 const chatStore = useChatStore()
 const groupStore = useGroupStore()
+const globalStore = useGlobalStore()
 const contactStore = useContactStore()
 const userStatusStore = useUserStatusStore()
+const userStore = useUserStore()
 /** 提醒框标题 */
 const tips = ref()
 const optionsType = ref<RoomActEnum>()
@@ -368,7 +408,23 @@ const originalGroupDetail = ref({
   groupRemark: ''
 })
 // 是否为群主
-const isGroupOwner = computed(() => groupDetail.value.role === 1)
+const isGroupOwner = computed(() => {
+  // 频道不能修改群头像和群名称
+  if (activeItem.roomId === '1' || activeItem.hotFlag === IsAllUserEnum.Yes) {
+    return false
+  }
+
+  // 检查groupStore.userList中当前用户的角色
+  const currentUser = groupStore.userList.find((user) => user.uid === userStore.userInfo.uid)
+
+  // 如果能在userList找到用户信息并确认角色，优先使用这个判断
+  if (currentUser) {
+    return currentUser.roleId === RoleEnum.LORD
+  }
+
+  // 否则回退到countInfo中的角色信息
+  return groupDetail.value.role === RoleEnum.LORD
+})
 // 我的群备注
 const myGroupRemark = computed(() => {
   if (activeItem.type === RoomTypeEnum.GROUP) {
@@ -387,6 +443,17 @@ if (type() !== 'linux') {
   peerConnection = new RTCPeerConnection()
 }
 
+const messageSettingType = ref(
+  activeItem.shield
+    ? 'shield'
+    : activeItem.muteNotification === NotificationTypeEnum.NOT_DISTURB
+      ? 'notification'
+      : 'shield'
+)
+const messageSettingOptions = ref([
+  { label: '接收消息但不提醒', value: 'notification' },
+  { label: '屏蔽消息', value: 'shield' }
+])
 const MIN_LOADING_TIME = 300 // 最小加载时间（毫秒）
 /** 是否在线 */
 const isOnline = computed(() => {
@@ -511,6 +578,20 @@ watch(
   }
 )
 
+watch(
+  () => groupStore.userList,
+  () => {
+    // 当群成员列表更新时，重新检查当前用户的权限
+    if (activeItem.type === RoomTypeEnum.GROUP) {
+      const currentUser = groupStore.userList.find((user) => user.uid === userStore.userInfo.uid)
+      if (currentUser && currentUser.roleId) {
+        groupDetail.value.role = currentUser.roleId
+      }
+    }
+  },
+  { deep: true }
+)
+
 watchEffect(() => {
   if (!messageOptions.value?.isLoading) {
     isLoading.value = false
@@ -520,13 +601,46 @@ watchEffect(() => {
   }
 })
 
+// 处理复制账号
+const handleCopy = () => {
+  if (activeItem.account) {
+    navigator.clipboard.writeText(activeItem.account)
+    window.$message.success(`复制成功 ${activeItem.account}`)
+  }
+}
+
+/** 处理创建群聊或邀请进群 */
+const handleCreateGroupOrInvite = () => {
+  if (activeItem.type === RoomTypeEnum.GROUP) {
+    handleInvite()
+  } else {
+    handleCreateGroup()
+  }
+}
+
+/** 处理创建群聊 */
+const handleCreateGroup = () => {
+  useMitt.emit(MittEnum.CREATE_GROUP, activeItem.id)
+}
+
+/** 处理邀请进群 */
+const handleInvite = async () => {
+  // 使用封装后的createModalWindow方法创建模态窗口
+  await createModalWindow('邀请好友进群', 'modal-invite', 600, 500, 'home')
+}
+
 // 获取群组详情
 const fetchGroupDetail = async () => {
   if (!activeItem.roomId || activeItem.type !== RoomTypeEnum.GROUP) return
+
+  // 检查当前用户在userList中的角色
+  const currentUser = groupStore.userList.find((user) => user.uid === userStore.userInfo.uid)
+
   groupDetail.value = {
     myNickname: groupStore.countInfo?.myName || '',
     groupRemark: groupStore.countInfo?.remark || '',
-    role: groupStore.countInfo?.role || 3 // 添加角色信息
+    // 优先使用userList中找到的角色信息，没有则使用countInfo中的role或默认值
+    role: currentUser?.roleId || groupStore.countInfo?.role || RoleEnum.NORMAL
   }
   // 保存原始值，用于后续比较
   originalGroupDetail.value = {
@@ -622,7 +736,14 @@ const handleTop = (value: boolean) => {
 /** 处理消息免打扰 */
 const handleNotification = (value: boolean) => {
   const newType = value ? NotificationTypeEnum.NOT_DISTURB : NotificationTypeEnum.RECEPTION
-
+  // 如果当前是屏蔽状态，需要先取消屏蔽
+  if (activeItem.shield) {
+    handleShield(false)
+  }
+  // 设置为消息免打扰时初始化为接收消息但不提醒
+  if (value) {
+    messageSettingType.value = 'notification'
+  }
   apis
     .notification({
       roomId: activeItem.roomId,
@@ -667,11 +788,39 @@ const handleShield = (value: boolean) => {
         shield: value
       })
 
+      // 1. 先保存当前聊天室ID
+      const tempRoomId = globalStore.currentSession.roomId
+
+      // 2. 设置为空值，触发清除当前消息
+      globalStore.currentSession.roomId = ''
+
+      // 3. 在下一个tick中恢复原来的聊天室ID，触发重新加载消息
+      nextTick(() => {
+        globalStore.currentSession.roomId = tempRoomId
+      })
+
       window.$message.success(value ? '已屏蔽消息' : '已取消屏蔽')
     })
     .catch(() => {
       window.$message.error('设置失败')
     })
+}
+
+const handleMessageSetting = (value: string) => {
+  if (value === 'shield') {
+    if (activeItem.shield) return
+    handleShield(true)
+  } else if (value === 'notification') {
+    // 检查当前的消息提醒状态是否已经是免打扰
+    const isCurrentlyMuted = activeItem.muteNotification === NotificationTypeEnum.NOT_DISTURB
+
+    // 如果当前是屏蔽状态，需要先取消屏蔽
+    if (activeItem.shield) {
+      handleShield(false)
+    }
+    if (isCurrentlyMuted) return
+    handleNotification(true)
+  }
 }
 
 /** 删除操作二次提醒 */
@@ -855,5 +1004,9 @@ onUnmounted(() => {
   &:hover .avatar-hover {
     opacity: 1;
   }
+}
+
+:deep(.n-scrollbar > .n-scrollbar-container > .n-scrollbar-content) {
+  padding-left: 2px;
 }
 </style>

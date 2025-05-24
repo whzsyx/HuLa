@@ -10,6 +10,10 @@
   -webkit-overflow-wrap: break-all;
   hyphens: auto; /** 行尾自动断开长单词 */
   -webkit-hyphens: auto;
+  user-select: text; /** 只允许选中文本 */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
   &.active {
     background-color: var(--bg-bubble-active);
     color: var(--text-color);
@@ -24,14 +28,42 @@
 }
 .bubble {
   &::selection {
-    background: transparent; /* 设置选中背景为透明 */
+    background: var(--select-bg-color, rgba(19, 152, 127, 0.3)); /* 设置选中背景颜色 */
   }
   @include bubble;
+
+  /* 确保子元素中非文本元素不可选 */
+  img,
+  svg,
+  .emoji,
+  button,
+  [role='button'] {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+  }
 }
 .bubble-oneself {
   @include bubble;
   @apply rounded-[18px_2px_18px_18px] color-#fff;
   background-color: var(--bg-active-msg);
+
+  &::selection {
+    background: var(--select-bg-color-self, rgba(255, 255, 255, 0.3)); /* 自己消息选中背景颜色 */
+  }
+
+  /* 确保子元素中非文本元素不可选 */
+  img,
+  svg,
+  .emoji,
+  button,
+  [role='button'] {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+  }
 }
 /**! 气泡动画 */
 .bubble-animation {
@@ -99,7 +131,7 @@
 }
 /** emoji回复气泡的样式 */
 .emoji-reply-bubble {
-  @apply relative rounded-50px p-[4px_8px] cursor-pointer select-none bg-#13987F66 text-14px w-fit border-(1px solid #13987F) custom-shadow;
+  @apply relative flex-y-center gap-4px rounded-50px p-[4px_8px] cursor-pointer select-none bg-#13987F66 text-14px w-fit border-(1px solid #13987F) custom-shadow;
 }
 /** 跳转到回复内容时候显示的样式 */
 .active-reply {
@@ -166,6 +198,25 @@
 .fade-translate-enter-from,
 .fade-translate-leave-to {
   opacity: 0;
+}
+
+// 置顶公告样式
+.feishu-announcement {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  background-color: var(--bg-notice, rgba(19, 152, 127, 0.08));
+  border-radius: 8px;
+  border: 1px solid var(--bg-notice, rgba(19, 152, 127, 0.2));
+  margin: 6px 12px 0 12px;
+  height: 34px;
+  transition: all 0.3s ease-in-out;
+  z-index: 10;
+}
+
+.announcement-hover {
+  background-color: var(--bg-notice-hover, rgba(19, 152, 127, 0.14));
 }
 
 /**! 替换ait的字体颜色 */

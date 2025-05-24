@@ -8,7 +8,8 @@ import { useContactStore } from '@/stores/contacts'
 import { useUserStore } from '@/stores/user'
 import { useGlobalStore } from '@/stores/global.ts'
 import { isDiffNow } from '@/utils/ComputedTime.ts'
-import { writeText } from '@tauri-apps/plugin-clipboard-manager'
+import { writeText, writeImage } from '@tauri-apps/plugin-clipboard-manager'
+import { detectImageFormat, imageUrlToUint8Array, isImageUrl } from '@/utils/imageUtils'
 import { translateText } from '@/services/translate'
 import { useSettingStore } from '@/stores/setting.ts'
 import { save } from '@tauri-apps/plugin-dialog'
@@ -54,7 +55,8 @@ export const useChatMain = () => {
       label: '添加到表情',
       icon: 'add-expression',
       click: async (item: MessageType) => {
-        const imageUrl = item.message.body.url
+        // 优先使用 url 字段，回退到 content 字段
+        const imageUrl = item.message.body.url || item.message.body.content
         if (!imageUrl) {
           window.$message.error('获取图片地址失败')
           return
@@ -117,7 +119,7 @@ export const useChatMain = () => {
       label: '复制',
       icon: 'copy',
       click: (item: MessageType) => {
-        handleCopy(item.message.body.content)
+        handleCopy(item.message.body.content, true)
       }
     },
     {
@@ -178,7 +180,9 @@ export const useChatMain = () => {
       label: '复制',
       icon: 'copy',
       click: async (item: MessageType) => {
-        await handleCopy(item.message.body.content)
+        // 对于图片消息，优先使用 url 字段，回退到 content 字段
+        const imageUrl = item.message.body.url || item.message.body.content
+        await handleCopy(imageUrl, true)
       }
     },
     ...commonMenuList.value,
@@ -288,8 +292,17 @@ export const useChatMain = () => {
         const targetUid = item.uid || item.fromUser?.uid
         if (!targetUid) return false
 
-        // 4. 检查目标用户是否已经是管理员或群主
-        if (item.roleId === RoleEnum.ADMIN || item.roleId === RoleEnum.LORD) return false
+        // 4. 检查目标用户角色
+        let targetRoleId = item.roleId
+
+        // 如果item中没有roleId，则通过uid从群成员列表中查找
+        if (targetRoleId === void 0) {
+          const targetUser = groupStore.userList.find((user) => user.uid === targetUid)
+          targetRoleId = targetUser?.roleId
+        }
+
+        // 检查目标用户是否已经是管理员或群主
+        if (targetRoleId === RoleEnum.ADMIN || targetRoleId === RoleEnum.LORD) return false
 
         // 5. 检查当前用户是否是群主
         const currentUser = groupStore.userList.find((user) => user.uid === userUid.value)
@@ -324,8 +337,17 @@ export const useChatMain = () => {
         const targetUid = item.uid || item.fromUser?.uid
         if (!targetUid) return false
 
-        // 4. 检查目标用户是否是管理员(只能撤销管理员,不能撤销群主)
-        if (item.roleId !== RoleEnum.ADMIN) return false
+        // 4. 检查目标用户角色
+        let targetRoleId = item.roleId
+
+        // 如果item中没有roleId，则通过uid从群成员列表中查找
+        if (targetRoleId === void 0) {
+          const targetUser = groupStore.userList.find((user) => user.uid === targetUid)
+          targetRoleId = targetUser?.roleId
+        }
+
+        // 检查目标用户是否是管理员(只能撤销管理员,不能撤销群主)
+        if (targetRoleId !== RoleEnum.ADMIN) return false
 
         // 5. 检查当前用户是否是群主
         const currentUser = groupStore.userList.find((user) => user.uid === userUid.value)
@@ -365,8 +387,17 @@ export const useChatMain = () => {
         const targetUid = item.uid || item.fromUser?.uid
         if (!targetUid) return false
 
-        // 4. 检查目标用户是否是群主(群主不能被移出)
-        if (item.roleId === RoleEnum.LORD) return false
+        // 4. 检查目标用户角色
+        let targetRoleId = item.roleId
+
+        // 如果item中没有roleId，则通过uid从群成员列表中查找
+        if (targetRoleId === void 0) {
+          const targetUser = groupStore.userList.find((user) => user.uid === targetUid)
+          targetRoleId = targetUser?.roleId
+        }
+
+        // 检查目标用户是否是群主(群主不能被移出)
+        if (targetRoleId === RoleEnum.LORD) return false
 
         // 5. 检查当前用户是否有权限(群主或管理员)
         const currentUser = groupStore.userList.find((user) => user.uid === userUid.value)
@@ -374,7 +405,7 @@ export const useChatMain = () => {
         const isAdmin = currentUser?.roleId === RoleEnum.ADMIN
 
         // 6. 如果当前用户是管理员,则不能移出其他管理员
-        if (isAdmin && item.roleId === RoleEnum.ADMIN) return false
+        if (isAdmin && targetRoleId === RoleEnum.ADMIN) return false
 
         return isLord || isAdmin
       }
@@ -388,20 +419,74 @@ export const useChatMain = () => {
   /** emoji表情菜单 */
   const emojiList = ref([
     {
-      label: '👍',
+      url: '/msgAction/like.png',
+      value: 1,
       title: '好赞'
     },
     {
-      label: '😆',
-      title: '开心'
+      url: '/msgAction/slightly-frowning-face.png',
+      value: 2,
+      title: '不满'
     },
     {
-      label: '🥳',
-      title: '恭喜'
+      url: '/msgAction/heart-on-fire.png',
+      value: 3,
+      title: '爱心'
     },
     {
-      label: '🤯',
-      title: '惊呆了'
+      url: '/msgAction/enraged-face.png',
+      value: 4,
+      title: '愤怒'
+    },
+    {
+      url: '/emoji/party-popper.webp',
+      value: 5,
+      title: '礼炮'
+    },
+    {
+      url: '/emoji/rocket.webp',
+      value: 6,
+      title: '火箭'
+    },
+    {
+      url: '/msgAction/face-with-tears-of-joy.png',
+      value: 7,
+      title: '笑哭'
+    },
+    {
+      url: '/msgAction/clapping.png',
+      value: 8,
+      title: '鼓掌'
+    },
+    {
+      url: '/msgAction/rose.png',
+      value: 9,
+      title: '鲜花'
+    },
+    {
+      url: '/msgAction/bomb.png',
+      value: 10,
+      title: '炸弹'
+    },
+    {
+      url: '/msgAction/exploding-head.png',
+      value: 11,
+      title: '疑问'
+    },
+    {
+      url: '/msgAction/victory-hand.png',
+      value: 12,
+      title: '胜利'
+    },
+    {
+      url: '/msgAction/flashlight.png',
+      value: 13,
+      title: '灯光'
+    },
+    {
+      url: '/msgAction/pocket-money.png',
+      value: 14,
+      title: '红包'
     }
   ])
 
@@ -419,32 +504,83 @@ export const useChatMain = () => {
   }
 
   /**
-   * 处理复制事件
-   * @param content 复制的内容
+   * 获取用户选中的文本
    */
-  const handleCopy = async (content: string) => {
-    // 如果是图片
-    // TODO 文件类型的在右键菜单中不设置复制 (nyh -> 2024-04-14 01:14:56)
-    if (content.includes('data:image')) {
-      // 创建一个新的图片标签
-      const img = new Image()
-      img.src = content
-      // 监听图片加载完成事件
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        canvas.width = img.width
-        canvas.height = img.height
-        const ctx = canvas.getContext('2d')
-        ctx?.drawImage(img, 0, 0, img.width, img.height)
-        // 将 base64 图片数据复制到剪贴板
-        canvas.toBlob((blob) => {
-          const item = new ClipboardItem({ 'image/png': blob! })
-          navigator.clipboard.write([item])
-        })
+  const getSelectedText = (): string => {
+    const selection = window.getSelection()
+    return selection ? selection.toString().trim() : ''
+  }
+
+  /**
+   * 检查是否有文本被选中
+   */
+  const hasSelectedText = (): boolean => {
+    const selection = window.getSelection()
+    return selection ? selection.toString().trim().length > 0 : false
+  }
+
+  /**
+   * 清除文本选择
+   */
+  const clearSelection = (): void => {
+    const selection = window.getSelection()
+    if (selection) {
+      selection.removeAllRanges()
+    }
+  }
+
+  /**
+   * 处理复制事件
+   * @param content 复制的内容（作为回退）
+   * @param prioritizeSelection 是否优先复制选中的文本
+   */
+  const handleCopy = async (content: string | undefined, prioritizeSelection: boolean = true) => {
+    try {
+      let textToCopy = content || ''
+      let isSelectedText = false
+
+      // 如果启用了优先选择模式，检查是否有选中的文本
+      if (prioritizeSelection) {
+        const selectedText = getSelectedText()
+        if (selectedText) {
+          textToCopy = selectedText
+          isSelectedText = true
+        }
       }
-    } else {
-      // 如果是纯文本
-      await writeText(removeTag(content))
+
+      // 检查内容是否为空
+      if (!textToCopy) {
+        window.$message?.warning('没有可复制的内容')
+        return
+      }
+
+      // 如果是图片
+      if (isImageUrl(textToCopy)) {
+        try {
+          const imageFormat = detectImageFormat(textToCopy)
+
+          // 提示用户正在处理不同格式的图片
+          if (imageFormat === 'GIF' || imageFormat === 'WEBP') {
+            window.$message?.info(`正在将 ${imageFormat} 格式图片转换为 PNG 并复制...`)
+          }
+
+          // 使用 Tauri 的 clipboard API 复制图片（自动转换为 PNG 格式）
+          const imageBytes = await imageUrlToUint8Array(textToCopy)
+          await writeImage(imageBytes)
+
+          const successMessage = imageFormat === 'PNG' ? '图片已复制到剪贴板' : '图片已转换为 PNG 格式并复制到剪贴板'
+          window.$message?.success(successMessage)
+        } catch (imageError) {
+          console.error('图片复制失败:', imageError)
+        }
+      } else {
+        // 如果是纯文本
+        await writeText(removeTag(textToCopy))
+        const message = isSelectedText ? '选中文本已复制' : '消息内容已复制'
+        window.$message?.success(message)
+      }
+    } catch (error) {
+      console.error('复制失败:', error)
     }
   }
 
@@ -453,7 +589,11 @@ export const useChatMain = () => {
    * @param type 消息类型
    */
   const handleItemType = (type: MsgEnum) => {
-    return type === MsgEnum.IMAGE ? imageMenuList.value : type === MsgEnum.FILE ? fileMenuList.value : menuList.value
+    return type === MsgEnum.IMAGE || type === MsgEnum.EMOJI
+      ? imageMenuList.value
+      : type === MsgEnum.FILE
+        ? fileMenuList.value
+        : menuList.value
   }
 
   /** 删除信息事件 */
@@ -468,7 +608,10 @@ export const useChatMain = () => {
     // 启用键盘监听
     const handleKeyPress = (e: KeyboardEvent) => {
       if ((e.ctrlKey && e.key === 'c') || (e.metaKey && e.key === 'c')) {
-        handleCopy(item.message.body.content)
+        // 优先复制用户选中的文本，如果没有选中则复制整个消息内容
+        // 对于图片或其他类型的消息，优先使用 url 字段
+        const contentToCopy = item.message.body.url || item.message.body.content
+        handleCopy(contentToCopy, true)
         // 取消监听键盘事件，以免多次绑定
         document.removeEventListener('keydown', handleKeyPress)
       }
@@ -481,6 +624,10 @@ export const useChatMain = () => {
     handleMsgClick,
     handleConfirm,
     handleItemType,
+    handleCopy,
+    getSelectedText,
+    hasSelectedText,
+    clearSelection,
     activeBubble,
     historyIndex,
     tips,

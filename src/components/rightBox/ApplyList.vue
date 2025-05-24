@@ -58,14 +58,25 @@
                 :options="dropdownOptions"
                 @select="(key: string) => handleFriendAction(key, item.applyId)">
                 <n-icon class="cursor-pointer px-6px">
-                  <svg class="size-16px"><use href="#more"></use></svg>
+                  <svg class="size-16px color-[--text-color]"><use href="#more"></use></svg>
                 </n-icon>
               </n-dropdown>
             </n-flex>
-            <span class="text-(12px #64a29c)" v-else-if="isCurrentUser(item.uid)">{{
-              isAccepted(item.targetId) ? '已同意' : '等待验证'
-            }}</span>
-            <span class="text-(12px #64a29c)" v-else>已同意</span>
+            <span
+              class="text-(12px #64a29c)"
+              :class="{ 'text-(12px #c14053)': item.status === RequestFriendAgreeStatus.Reject }"
+              v-else-if="isCurrentUser(item.uid)"
+              >{{
+                isAccepted(item.targetId)
+                  ? '已同意'
+                  : item.status === RequestFriendAgreeStatus.Reject
+                    ? '对方已拒绝'
+                    : '等待验证'
+              }}</span
+            >
+            <span class="text-(12px #64a29c)" v-else-if="item.status === RequestFriendAgreeStatus.Agree">已同意</span>
+            <span class="text-(12px #c14053)" v-else-if="item.status === RequestFriendAgreeStatus.Reject">已拒绝</span>
+            <span class="text-(12px #909090)" v-else-if="item.status === RequestFriendAgreeStatus.Ignore">已忽略</span>
           </n-flex>
         </n-flex>
       </template>
@@ -186,6 +197,11 @@ const handleFriendAction = async (action: string, applyId: string) => {
     }, 600)
   }
 }
+
+onMounted(() => {
+  // 组件挂载时刷新一次列表
+  contactStore.getRequestFriendsList(true)
+})
 </script>
 
 <style scoped lang="scss"></style>

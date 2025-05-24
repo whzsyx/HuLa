@@ -32,7 +32,7 @@ export enum WsResponseMessageType {
   REQUEST_APPROVAL_FRIEND = 'requestApprovalFriend',
   /** 用户状态改变 */
   USER_STATE_CHANGE = 'userStateChange',
-  /** 管理员修改群聊信息 */
+  /** 群主修改群聊信息 */
   ROOM_INFO_CHANGE = 'roomInfoChange',
   /** 自己修改我在群里的信息 */
   MY_ROOM_INFO_CHANGE = 'myRoomInfoChange',
@@ -43,7 +43,9 @@ export enum WsResponseMessageType {
   /** 群公告已读 */
   ROOM_GROUP_NOTICE_READ_MSG = 'roomGroupNoticeReadMsg',
   /** 群解散 */
-  ROOM_DISSOLUTION = 'roomDissolution'
+  ROOM_DISSOLUTION = 'roomDissolution',
+  /** 编辑群公告 */
+  ROOM_EDIT_GROUP_NOTICE_MSG = 'roomEditGroupNoticeMsg'
 }
 
 /**

@@ -14,9 +14,15 @@ import { getEnhancedFingerprint } from '@/services/fingerprint.ts'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { useTauriListener } from '@/hooks/useTauriListener'
 import { listen, emit } from '@tauri-apps/api/event'
+import { useDebounceFn } from '@vueuse/core'
 
 // 创建 webSocket worker
 const worker: Worker = new Worker(new URL('../workers/webSocket.worker.ts', import.meta.url), {
+  type: 'module'
+})
+
+// 创建 timer worker
+const timerWorker: Worker = new Worker(new URL('../workers/timer.worker.ts', import.meta.url), {
   type: 'module'
 })
 
@@ -31,17 +37,131 @@ class WS {
   #connectReady = false
   // 使用LRU缓存替代简单的Set
   #processedMsgCache = new Map<number, number>()
-  // TODO: 暂时使用去重复的逻辑，后续优化
-  // readonly #MAX_CACHE_SIZE = 1000
 
   #tauriListener: ReturnType<typeof useTauriListener> | null = null
+
+  // 存储前一个连接状态，用于检测重连成功
+  #previousConnectionState = ConnectionState.DISCONNECTED
+
+  // 存储连接健康状态信息
+  #connectionHealth = {
+    isHealthy: true,
+    lastPongTime: null as number | null,
+    timeSinceLastPong: null as number | null
+  }
 
   constructor() {
     this.initWindowType()
     if (isMainWindow) {
       this.initConnect()
-      // 收到消息
+      // 收到WebSocket worker消息
       worker.addEventListener('message', this.onWorkerMsg)
+      // 收到Timer worker消息
+      timerWorker.addEventListener('message', this.onTimerWorkerMsg)
+      // 添加页面可见性监听
+      this.initVisibilityListener()
+    }
+  }
+
+  // 初始化页面可见性监听
+  private async initVisibilityListener() {
+    const handleVisibilityChange = (isVisible: boolean) => {
+      worker.postMessage(
+        JSON.stringify({
+          type: 'visibilityChange',
+          value: { isHidden: !isVisible }
+        })
+      )
+    }
+
+    const debouncedVisibilityChange = useDebounceFn((isVisible: boolean) => {
+      handleVisibilityChange(isVisible)
+    }, 300)
+
+    // 使用document.visibilitychange事件 兼容web
+    document.addEventListener('visibilitychange', () => {
+      const isVisible = !document.hidden
+      console.log(`document visibility change: ${document.hidden ? '隐藏' : '可见'}`)
+      debouncedVisibilityChange(isVisible)
+    })
+
+    // 跟踪当前窗口状态，避免无变化时重复触发
+    let currentVisibilityState = true
+
+    // 创建状态变更处理器
+    const createStateChangeHandler = (newState: boolean) => {
+      return () => {
+        if (currentVisibilityState !== newState) {
+          currentVisibilityState = newState
+          debouncedVisibilityChange(newState)
+        }
+      }
+    }
+
+    try {
+      // 设置各种Tauri窗口事件监听器
+      // 窗口失去焦点 - 隐藏状态
+      await listen('tauri://blur', createStateChangeHandler(false))
+
+      // 窗口获得焦点 - 可见状态
+      await listen('tauri://focus', createStateChangeHandler(true))
+
+      // 窗口最小化 - 隐藏状态
+      await listen('tauri://window-minimized', createStateChangeHandler(false))
+
+      // 窗口恢复 - 可见状态
+      await listen('tauri://window-restored', createStateChangeHandler(true))
+
+      // 窗口隐藏 - 隐藏状态
+      await listen('tauri://window-hidden', createStateChangeHandler(false))
+
+      // 窗口显示 - 可见状态
+      await listen('tauri://window-shown', createStateChangeHandler(true))
+    } catch (error) {
+      console.error('无法设置Tauri Window事件监听:', error)
+    }
+  }
+
+  // 处理Timer worker消息
+  onTimerWorkerMsg = (e: MessageEvent<any>) => {
+    const data = e.data
+    switch (data.type) {
+      case 'timeout': {
+        // 检查是否是心跳超时消息
+        if (data.msgId && data.msgId.startsWith('heartbeat_timeout_')) {
+          // 转发给WebSocket worker
+          worker.postMessage(JSON.stringify({ type: 'heartbeatTimeout' }))
+        }
+        // 处理任务队列定时器超时
+        else if (data.msgId === 'process_tasks_timer') {
+          const userStore = useUserStore()
+          if (userStore.isSign) {
+            // 处理堆积的任务
+            for (const task of this.#tasks) {
+              this.send(task)
+            }
+            // 清空缓存的消息
+            this.#tasks = []
+          }
+        }
+        break
+      }
+      case 'periodicHeartbeat': {
+        // 心跳触发，转发给WebSocket worker
+        worker.postMessage(JSON.stringify({ type: 'heartbeatTimerTick' }))
+        break
+      }
+      case 'reconnectTimeout': {
+        // timer上报重连超时事件，转发给WebSocket worker
+        console.log('重试次数: ', data.reconnectCount)
+        worker.postMessage(
+          JSON.stringify({
+            type: 'reconnectTimeout',
+            value: { reconnectCount: data.reconnectCount }
+          })
+        )
+        break
+      }
     }
   }
 
@@ -83,9 +203,18 @@ class WS {
       localStorage.removeItem('user')
     }
     const clientId = await getEnhancedFingerprint()
+    const savedProxy = localStorage.getItem('proxySettings')
+    let serverUrl = import.meta.env.VITE_WEBSOCKET_URL
+    if (savedProxy) {
+      const settings = JSON.parse(savedProxy)
+      const suffix = settings.wsIp + ':' + settings.wsPort + '/' + settings.wsSuffix
+      if (settings.wsType === 'ws' || settings.wsType === 'wss') {
+        serverUrl = settings.wsType + '://' + suffix
+      }
+    }
     // 初始化 ws
     worker.postMessage(
-      `{"type":"initWS","value":{"token":${token ? `"${token}"` : null},"clientId":${clientId ? `"${clientId}"` : null}}}`
+      `{"type":"initWS","value":{"token":${token ? `"${token}"` : null},"clientId":${clientId ? `"${clientId}", "serverUrl":"${serverUrl}"` : null}}}`
     )
   }
 
@@ -114,20 +243,94 @@ class WS {
         useMitt.emit(WsResponseMessageType.NO_INTERNET, params.value)
         // 如果是重连失败，可以提示用户刷新页面
         if ((params.value as { msg: string }).msg.includes('连接失败次数过多')) {
+          useMitt.emit('showMainMessage', { title: '连接断开', content: '连接已断开，请刷新页面或重新登录。' })
           // 可以触发UI提示，让用户刷新页面
-          // TODO: 无感帮助用户刷新页面
           useMitt.emit('wsReconnectFailed', params.value)
         }
         break
       }
+      case 'startReconnectTimer': {
+        console.log('worker上报心跳超时事件', params.value)
+        // 向timer发送startReconnectTimer事件
+        timerWorker.postMessage({
+          type: 'startReconnectTimer',
+          reconnectCount: (params.value as any).reconnectCount as number,
+          value: { delay: 1000 }
+        })
+        break
+      }
+      // 心跳定时器相关消息处理
+      case 'startHeartbeatTimer': {
+        // 启动心跳定时器
+        const { interval } = params.value as { interval: number }
+        timerWorker.postMessage({
+          type: 'startPeriodicHeartbeat',
+          interval
+        })
+        break
+      }
+      case 'stopHeartbeatTimer': {
+        // 停止心跳定时器
+        timerWorker.postMessage({
+          type: 'stopPeriodicHeartbeat'
+        })
+        break
+      }
+      case 'startHeartbeatTimeoutTimer': {
+        // 启动心跳超时定时器
+        const { timerId, timeout } = params.value as { timerId: string; timeout: number }
+        timerWorker.postMessage({
+          type: 'startTimer',
+          msgId: timerId,
+          duration: timeout
+        })
+        break
+      }
+      case 'clearHeartbeatTimeoutTimer': {
+        // 清除心跳超时定时器
+        const { timerId } = params.value as { timerId: string }
+        timerWorker.postMessage({
+          type: 'clearTimer',
+          msgId: timerId
+        })
+        break
+      }
       case 'connectionStateChange': {
         const { state } = params.value as { state: ConnectionState }
+
+        // 检测重连成功: 从RECONNECTING状态变为CONNECTED状态
+        if (this.#previousConnectionState === ConnectionState.RECONNECTING && state === ConnectionState.CONNECTED) {
+          console.log('🔄 WebSocket 重连成功')
+          // 可以添加UI提示
+          useMitt.emit('showMainMessage', { title: '连接恢复', content: '网络连接已恢复' })
+        }
+
+        // 更新前一状态
+        this.#previousConnectionState = state
+
         console.log('连接状态改变', state)
         useMitt.emit('wsConnectionStateChange', state)
         // 广播状态变化给其他窗口
         if (isMainWindow) {
           await emit('ws-state-change', state)
         }
+        break
+      }
+      // 处理心跳响应
+      case 'pongReceived': {
+        const { timestamp } = params.value as { timestamp: number }
+        this.#connectionHealth.lastPongTime = timestamp
+        break
+      }
+      // 处理连接健康状态
+      case 'connectionHealthStatus': {
+        const { isHealthy, lastPongTime, timeSinceLastPong } = params.value as {
+          isHealthy: boolean
+          lastPongTime: number | null
+          timeSinceLastPong: number | null
+        }
+        this.#connectionHealth = { isHealthy, lastPongTime, timeSinceLastPong }
+        useMitt.emit('wsConnectionHealthChange', this.#connectionHealth)
         break
       }
     }
@@ -143,17 +346,11 @@ class WS {
     // 先探测登录态
     // this.#detectionLoginStatus()
 
-    setTimeout(() => {
-      const userStore = useUserStore()
-      if (userStore.isSign) {
-        // 处理堆积的任务
-        for (const task of this.#tasks) {
-          this.send(task)
-        }
-        // 清空缓存的消息
-        this.#tasks = []
-      }
-    }, 500)
+    timerWorker.postMessage({
+      type: 'startTimer',
+      msgId: 'process_tasks_timer',
+      duration: 500
+    })
   }
 
   #send(msg: WsReqMsgContentType) {
@@ -205,10 +402,6 @@ class WS {
         // 收到消息
         case WsResponseMessageType.RECEIVE_MESSAGE: {
           const message = params.data as MessageType
-          // TODO: 暂时保留去重
-          // if (this.#isMessageProcessed(message.message.id)) {
-          //   break
-          // }
           useMitt.emit(WsResponseMessageType.RECEIVE_MESSAGE, message)
           break
         }
@@ -242,9 +435,8 @@ class WS {
           useMitt.emit(WsResponseMessageType.INVALID_USER, params.data as { uid: number })
           break
         }
-        // 点赞、倒赞消息通知
+        // 点赞、不满消息通知
         case WsResponseMessageType.MSG_MARK_ITEM: {
-          console.log('点赞')
           useMitt.emit(WsResponseMessageType.MSG_MARK_ITEM, params.data as { markList: MarkItemType[] })
           break
         }
@@ -299,6 +491,47 @@ class WS {
           )
           break
         }
+        case WsResponseMessageType.ROOM_INFO_CHANGE: {
+          console.log('群主修改群聊信息', params.data)
+          useMitt.emit(
+            WsResponseMessageType.ROOM_INFO_CHANGE,
+            params.data as {
+              roomId: string
+              name: string
+              avatar: string
+            }
+          )
+          break
+        }
+        case WsResponseMessageType.ROOM_GROUP_NOTICE_MSG: {
+          console.log('发布群公告', params.data)
+          useMitt.emit(
+            WsResponseMessageType.ROOM_GROUP_NOTICE_MSG,
+            params.data as {
+              id: string
+              content: string
+              top: string
+            }
+          )
+          break
+        }
+        case WsResponseMessageType.ROOM_EDIT_GROUP_NOTICE_MSG: {
+          console.log('编辑群公告', params.data)
+          useMitt.emit(
+            WsResponseMessageType.ROOM_EDIT_GROUP_NOTICE_MSG,
+            params.data as {
+              id: string
+              content: string
+              top: string
+            }
+          )
+          break
+        }
+        case WsResponseMessageType.ROOM_DISSOLUTION: {
+          console.log('群解散', params.data)
+          useMitt.emit(WsResponseMessageType.ROOM_DISSOLUTION, params.data)
+          break
+        }
         default: {
           console.log('接收到未处理类型的消息:', params)
           break
@@ -310,31 +543,32 @@ class WS {
       return
     }
   }
-  // TODO: 暂时使用去重复的逻辑，后续优化
-  // #isMessageProcessed(msgId: number): boolean {
-  //   const now = Date.now()
-  //   const lastProcessed = this.#processedMsgCache.get(msgId)
 
-  //   if (lastProcessed && now - lastProcessed < 5000) {
-  //     return true
-  //   }
+  // 检查连接健康状态
+  checkConnectionHealth() {
+    if (isMainWindow) {
+      worker.postMessage(
+        JSON.stringify({
+          type: 'checkConnectionHealth'
+        })
+      )
+      return this.#connectionHealth
+    }
+    return null
+  }
 
-  //   // 清理过期缓存
-  //   if (this.#processedMsgCache.size >= this.#MAX_CACHE_SIZE) {
-  //     const oldestEntries = Array.from(this.#processedMsgCache.entries())
-  //       .sort(([, a], [, b]) => a - b)
-  //       .slice(0, Math.floor(this.#MAX_CACHE_SIZE / 2))
-
-  //     oldestEntries.forEach(([key]) => this.#processedMsgCache.delete(key))
-  //   }
-
-  //   this.#processedMsgCache.set(msgId, now)
-  //   return false
-  // }
+  // 获取当前连接健康状态
+  getConnectionHealth() {
+    return this.#connectionHealth
+  }
 
   destroy() {
     worker.postMessage(JSON.stringify({ type: 'clearReconnectTimer' }))
     worker.terminate()
+    // 同时终止timer worker相关的心跳
+    timerWorker.postMessage({
+      type: 'stopPeriodicHeartbeat'
+    })
     this.#tasks = []
     this.#processedMsgCache.clear()
     this.#connectReady = false

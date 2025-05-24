@@ -45,8 +45,12 @@
             </n-flex>
 
             <n-flex align="center" justify="space-between">
-              <span class="text flex-1 leading-tight text-12px truncate" v-html="item.lastMsg.replace(':', '：')">
-              </span>
+              <template v-if="item.isAtMe">
+                <span class="text flex-1 leading-tight text-12px truncate" v-html="item.lastMsg.replace(':', '：')" />
+              </template>
+              <template v-else>
+                <span class="text flex-1 leading-tight text-12px truncate" v-text="item.lastMsg.replace(':', '：')" />
+              </template>
 
               <!-- 消息提示 -->
               <template v-if="item.muteNotification === 1 && !item.unreadCount">
@@ -101,19 +105,18 @@
 </template>
 <script lang="ts" setup name="message">
 import { useMessage } from '@/hooks/useMessage.ts'
-import { MittEnum, MsgEnum, RoomTypeEnum } from '@/enums'
+import { MittEnum, RoomTypeEnum } from '@/enums'
 import { IsAllUserEnum, SessionItem } from '@/services/types.ts'
 import { formatTimestamp } from '@/utils/ComputedTime.ts'
 import { useChatStore } from '@/stores/chat.ts'
 import { useGlobalStore } from '@/stores/global.ts'
 import { useUserInfo } from '@/hooks/useCached.ts'
-import { renderReplyContent } from '@/utils/RenderReplyContent.ts'
+import { useReplaceMsg } from '@/hooks/useReplaceMsg.ts'
 import { useCommon } from '@/hooks/useCommon.ts'
 import SysNTF from '@/components/common/SystemNotification.tsx'
 import { AvatarUtils } from '@/utils/AvatarUtils'
 import { useGroupStore } from '@/stores/group.ts'
 import { useMitt } from '@/hooks/useMitt'
-import { useUserStore } from '@/stores/user'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { useTauriListener } from '@/hooks/useTauriListener'
 
@@ -122,8 +125,7 @@ const { addListener } = useTauriListener()
 const chatStore = useChatStore()
 const globalStore = useGlobalStore()
 const groupStore = useGroupStore()
-const { userUid, openMsgSession } = useCommon()
-const userStore = useUserStore()
+const { openMsgSession } = useCommon()
 const msgScrollbar = useTemplateRef<HTMLElement>('msg-scrollbar')
 const { handleMsgClick, handleMsgDelete, menuList, specialMenuList, handleMsgDblclick } = useMessage()
 const currentSession = computed(() => globalStore.currentSession)
@@ -144,43 +146,45 @@ const sessionList = computed(() => {
           latestAvatar = useUserInfo(item.id).value.avatar || item.avatar
         }
 
-        if (lastMsg) {
-          const lastMsgUserName = useUserInfo(lastMsg.fromUser.uid)
-
-          // 添加@提醒判断 - 修改比较逻辑，确保类型一致
-          const messagesWithAt = messages.filter((msg) =>
-            msg.message?.body?.atUidList?.some((atUid: string) => String(atUid) === String(userStore.userInfo.uid))
-          )
-
-          // 检查是否有@我的消息以及是否在未读范围内
-          const isAtMe =
-            item.type === RoomTypeEnum.GROUP &&
-            currentSession.value.roomId !== item.roomId &&
-            messagesWithAt.some((msg) => messages.indexOf(msg) >= messages.length - (item.unreadCount || 0))
-
-          const atPrefix = isAtMe ? '<span class="text-#d5304f mr-4px">[有人@我]</span>' : ''
-
-          LastUserMsg =
-            lastMsg.message?.type === MsgEnum.RECALL
-              ? item.type === RoomTypeEnum.GROUP
-                ? `${lastMsgUserName.value.name}:撤回了一条消息`
-                : lastMsg.fromUser.uid === userUid.value
-                  ? '你撤回了一条消息'
-                  : '对方撤回了一条消息'
-              : `${atPrefix}${
-                  renderReplyContent(
-                    lastMsgUserName.value.name,
-                    lastMsg.message?.type,
-                    lastMsg.message?.body?.content || lastMsg.message?.body,
-                    item.type
-                  ) as string
-                }`
+        // 获取群聊备注名称（如果有）
+        let displayName = item.name
+        if (item.type === RoomTypeEnum.GROUP && item.remark) {
+          // 使用群组备注（如果存在）
+          displayName = item.remark
         }
+
+        if (lastMsg) {
+          // 使用 useAtMention hook 检查是否有@我的消息
+          const { checkRoomAtMe, formatMessageContent, getMessageSenderName } = useReplaceMsg()
+
+          // 获取发送者信息
+          const senderName = getMessageSenderName(lastMsg)
+
+          // 检查是否有@我的消息
+          const isAtMe = checkRoomAtMe(item.roomId, item.type, currentSession.value.roomId, messages, item.unreadCount)
+
+          // 使用封装后的方法处理消息内容，包括撤回消息和@提醒
+          LastUserMsg = formatMessageContent(lastMsg, item.type, senderName, isAtMe)
+
+          // 返回带有isAtMe标记的对象和修改后的名称
+          return {
+            ...item,
+            avatar: latestAvatar,
+            name: displayName, // 使用可能修改过的显示名称
+            lastMsg: LastUserMsg || item.text || '欢迎使用HuLa',
+            lastMsgTime: formatTimestamp(item?.activeTime),
+            isAtMe: isAtMe
+          }
+        }
+
+        // 如果没有最后一条消息，则返回不带@标记的对象，但也包含修改后的名称
         return {
           ...item,
           avatar: latestAvatar,
-          lastMsg: LastUserMsg || item.text || '欢迎使用HuLa',
-          lastMsgTime: formatTimestamp(item?.activeTime)
+          name: displayName, // 使用可能修改过的显示名称
+          lastMsg: item.text || '欢迎使用HuLa',
+          lastMsgTime: formatTimestamp(item?.activeTime),
+          isAtMe: false
         }
       })
       // 添加排序逻辑：先按置顶状态排序，再按活跃时间排序
@@ -202,17 +206,21 @@ watch(
       // 判断是否是群聊
       if (newVal.type === RoomTypeEnum.GROUP) {
         // 在这里请求是因为这里一开始选中就会触发，而在chat.ts中则需要切换会话才会触发
-        await groupStore.getCountStatistic()
+        // await groupStore.getCountStatistic()
+        // 同时获取群成员列表，确保首次加载时也能显示群成员
+        // await groupStore.getGroupUserList(true, newVal.roomId)
         // 将群组详情信息传递给handleMsgClick方法
-        handleMsgClick({
+        const sessionItem = {
           ...newVal,
           memberNum: groupStore.countInfo?.memberNum,
           remark: groupStore.countInfo?.remark,
           myName: groupStore.countInfo?.myName
-        })
+        }
+        handleMsgClick(sessionItem)
       } else {
         // 非群聊直接传递原始信息
-        handleMsgClick(newVal as SessionItem)
+        const sessionItem = newVal as SessionItem
+        handleMsgClick(sessionItem)
       }
     }
   },
@@ -254,6 +262,7 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 @use '@/styles/scss/message';
+
 #image-no-data {
   @apply size-full mt-60px text-[--text-color] text-14px;
 }

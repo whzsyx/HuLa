@@ -5,6 +5,11 @@
 <p align="center">An Instant Messaging System Built with Tauri, Vite 6, Vue 3, and TypeScript</p>
 
 <div align="center">
+  <a href="https://hellogithub.com/repository/743b101346c54f6cb5c20eed2edbaa40" target="_blank"><img src="https://abroad.hellogithub.com/v1/widgets/recommend.svg?rid=743b101346c54f6cb5c20eed2edbaa40&claim_uid=WsQaY6SlnL7qxG3&theme=neutral" alt="Featured｜HelloGitHub" style="width: 250px; height: 54px;" width="250" height="54" /></a>
+</div>
+
+<div align="center">
+  <a href="https://deepwiki.com/HuLaSpark/HuLa"><img src="https://deepwiki.com/badge.svg" alt=""></a>
   <a href="https://app.fossa.com/projects/git%2Bgithub.com%2FHuLaSpark%2FHuLa?ref=badge_shield"><img src="https://app.fossa.com/api/projects/git%2Bgithub.com%2FHuLaSpark%2FHuLa.svg?type=shield" alt=""></a>
   <a href="https://www.bestpractices.dev/zh-CN/projects/9692"><img src="https://bestpractices.coreinfrastructure.org/projects/9692/badge" alt="CI"></a>
   <img src="https://img.shields.io/badge/TypeScript-blue?logo=Typescript&style=flat&logoColor=fff">
@@ -15,7 +20,6 @@
   <img src="https://img.shields.io/badge/UnoCss-efefef?logo=UnoCss&logoColor=606060">
   <img src="https://img.shields.io/badge/pnpm-909090?logo=pnpm&logoColor=FFC131">
   <img src="https://img.shields.io/badge/Sass-CC6699?logo=sass&logoColor=fff">
-  <img src="https://img.shields.io/badge/Design-Naive-059669">
 </div>
 
 <p align="center">
@@ -28,23 +32,37 @@
 </p>
 
 <p align="center">
+  💻 Official Website：<a href="https://hulaspark.com">HuLaSpark</a>
+</p>
+
+<p align="center">
   ☕️ server：<a href="https://github.com/HulaSpark/HuLa-Server">github HuLa-Server</a> | <a href="https://gitee.com/HulaSpark/HuLa-Server">gitee HuLa-Server</a>
 </p>
 
 <p align="center"><a href="README.zh-CN.md">中文</a> | English</p>
 
-## Project Introduction
+## 🌐 Support platform
+
+| Platform | Supported version |
+|------|---------|
+| Windows | Windows 10, Windows 11 |
+| macOS | macOS 10.5+ |
+| Linux | Ubuntu 22.0+ |
+| iOS/iPadOS | iOS 9.0+, iPadOS 9.0+ |
+| Android | Android 8.0+ |
+
+## 📝 Project Introduction
 
 HuLa is an instant messaging system developed with Tauri, Vite 6, Vue 3, and TypeScript. It leverages the cross-platform capabilities of Tauri and the reactive design of Vue 3, combined with TypeScript's type safety features and the fast build system of Vite 6, to provide users with an efficient, secure, and easy-to-use communication solution.
 
-## Technology Stack
+## 🛠️ Technology Stack
 
 - **Tauri**: Provides a lightweight, high-performance desktop application container, enabling the development of cross-platform desktop applications with a web technology stack. Tauri's design philosophy aims to minimize resource consumption while ensuring security.
 - **Vite 6**: A modern front-end build tool that uses native ES module import to offer a fast development server. At the same time, it provides robust support for production builds. Vite 6 is its latest version, bringing more optimizations and features.
 - **Vue 3**: A progressive JavaScript framework for building user interfaces. Its Composition API, improved TypeScript integration, and optimizations for mobile platforms make developing complex single-page applications simpler and more efficient.
 - **TypeScript**: A superset of JavaScript that adds a type system to the language. It enables catching more errors during development and provides better support from editors.
 
-## Project PreView
+## 🖼️ Project PreView
 
 ![img.png](preview/img.png)
 
@@ -74,6 +92,10 @@ HuLa is an instant messaging system developed with Tauri, Vite 6, Vue 3, and Typ
   <img src="preview/img_8.png" alt="img_8.png" style="border-radius: 8px; display: block;"  />
 </div>
 
+<div style="padding: 28px; display: inline-block;">
+  <img src="preview/img_9.png" alt="img_9.png" style="border-radius: 8px; display: block;"  />
+</div>
+
 ## ✨ Completed Features
 
 | Feature Category | Feature Description | Status |
@@ -88,14 +110,17 @@ HuLa is an instant messaging system developed with Tauri, Vite 6, Vue 3, and Typ
 | | Message Read Status | ✅ Completed |
 | | Emoji Function | ✅ Completed |
 | | Context Menu Based on Message Type | ✅ Completed |
+| | Support parsing links as preview cards | ✅ Completed |
+| | Message likes and dissatisfaction status | ✅ Completed |
 | 👥 **Contact & Group Management** | Friend Add/Remove | ✅ Completed |
 | | Friend Search | ✅ Completed |
 | | Group Creation and Management | ✅ Completed |
 | | Friend Online Status | ✅ Completed |
 | | Friend Badges | ✅ Completed |
-| | Friend & Group Notes | ✅ Completed |
-| | Group Announcements | ✅ Completed |
 | | Block, Blacklist, Do Not Disturb | ✅ Completed |
+| | Message by message merging and forwarding | 🚧 In Progress |
+| | Group Announcement | ✅ 已完成 |
+| | Group chat、individual chat notes, nicknames, etc | ✅ 已完成 |
 | 🎨 **UI Interface** | Modern Interface Design | ✅ Completed |
 | | Dark/Light Theme Support | ✅ Completed |
 | | Skin Theme Switching | ✅ Completed |
@@ -104,17 +129,19 @@ HuLa is an instant messaging system developed with Tauri, Vite 6, Vue 3, and Typ
 | | Message Notifications | ✅ Completed |
 | | Image Viewer | ✅ Completed |
 | | Screenshot Function | 🚧 In Progress |
+| | Support automatic/forced updates | ✅ Completed |
+| | Customize update page | ✅ Completed |
 | 🌐 **Cross-platform Support** | Win10, Win11/macOS/Linux | ✅ Completed |
 | | iOS/Android Adaptation | 🚧 In Progress |
 | 🤖 **AI** | DeepSeek, ChatGPT, Claude, Qwen, Custom | 🚧 In Progress |
 
-## Thanks to the following contributors!
+## 👏 Thanks to the following contributors!
 
 <a href="https://github.com/HuLaSpark/HuLa/graphs/contributors">
   <img src="https://opencollective.com/HuLaSpark/contributors.svg?width=890" />
 </a>
 
-## Installation and Running
+## 📥 Installation and Running
 
 ```bash
 # Clone the project
@@ -142,20 +169,25 @@ Downloading the installation package on the web page will indicate that the inst
 #### 1. Open "System Settings" - "Security & Privacy", as shown in the figure, check the box: Allow apps downloaded from "Any Source" to run:
 
 <div style="padding: 28px; display: inline-block;">
-  <img src="preview/img_9.png" alt="img_9.png" style="border-radius: 8px; display: block;"  />
+  <img src="preview/img_10.png" alt="img_10.png" style="border-radius: 8px; display: block;"  />
 </div>
 
 #### 2. If an error is reported, run the following command in the terminal to resolve the problem:
 
 ```bash
+## Execute before installation
 sudo xattr -rd com.apple.quarantine the Path To Install The Package/Download installation package name
 ```
+```bash
+## If it has already been installed, proceed as follows
+sudo xattr -r -d com.apple.quarantine /Applications/apply name.app
+```
 
-## SubmissionSpecification
+## 📋 SubmissionSpecification
 
 use **pnpm run commit** to invoke the _git commit_ interaction and follow the prompts to complete the input and selection of information
 
-## Disclaimer
+## ⚖️ Disclaimer
 
 1. This project is provided as an open source project, and the developer does not provide any express or implied warranty of any kind as to the functionality, security, or suitability of the software to the extent permitted by law
 2. The User expressly understands and agrees that the use of the Software is entirely at the User's own risk and that the Software is provided on an "as is" and "as available" basis. The developer disclaims all warranties of any kind, whether express or implied, including, but not limited to, warranties of merchantability, fitness for a particular purpose, and non-infringement
@@ -165,7 +197,7 @@ use **pnpm run commit** to invoke the _git commit_ interaction and follow the pr
 
 **The final interpretation of this disclaimer belongs to the developer**
 
-## Sponsor HuLa
+## 🎁 Sponsor HuLa
 If you think HuLa is helpful to you, welcome to sponsor HuLa. Your support is our motivation to keep moving forward.
 
 <div style="display: flex;">
@@ -175,25 +207,30 @@ If you think HuLa is helpful to you, welcome to sponsor HuLa. Your support is ou
 </div>
 
 
-## HuLa Community discussion groups
+## 💬 HuLa Community discussion groups
 <img src="preview/wx.png" width="260" height="300" alt="微信群二维码" style="border-radius: 12px;" />
 
-## List of sponsors
+## 🙏 List of sponsors
 Thanks to the following sponsors for their support!
 
 | Date | Sponsor | Sum | Platform |
 |------|--------|------|------|
+| 2025-04-25 | 上官俊斌 | ￥200 | 微信赞赏码 |
+| 2025-04-20 | 姜兴(Simon) | ￥188 | 微信赞赏码 |
 | 2025-02-17 | 禾硕 | ￥168 | 支付宝赞赏 |
 | 2025-02-8 | Boom.... | ￥100 | 微信赞赏码 |
+| 2025-05-09 | 犹豫，就会败北。| ￥88.00 | 微信红包 |
 | 2025-04-01 | 墨       | ￥88.88 | 微信转账 |
 | 2025-02-8 | 邓伟 | ￥88 | 微信赞赏码 |
 | 2025-02-7 | dennis | ￥80 | gitee码云赞赏 |
+| 2025-05-15 | 孤鸿影 | ￥56 | 微信红包 |
 | 2025-02-6 | 小二 | ￥62 | 微信转账 |
+| 2025-05-20 | 没有留名的赞助者 | ￥20 | 微信赞赏码 |
 
 > Note: This list is manually updated. If you have sponsored but are not displayed in the list, please contact us by:
  1. Submit Issue on GitHub
  2. Send an email to: 2439646234@qq.com
  3. Contact via WeChat: cy2439646234
 
-## License
+## 📄 License
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FHuLaSpark%2FHuLa.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FHuLaSpark%2FHuLa?ref=badge_large)

@@ -84,8 +84,8 @@
               <n-flex align="center" :size="10" class="h-75px pl-6px pr-8px flex-1 truncate">
                 <n-avatar
                   round
+                  style="border: 1px solid var(--avatar-border-color)"
                   bordered
-                  :color="'#fff'"
                   :size="44"
                   :src="AvatarUtils.getAvatarUrl(item.avatar)"
                   fallback-src="/logo.png" />
@@ -135,6 +135,7 @@ const hasPendingFriendRequests = computed(() => {
 
 /** 群聊列表 */
 const groupChatList = computed(() => {
+  console.log(contactStore.groupChatList)
   return [...contactStore.groupChatList].sort((a, b) => {
     // 将roomId为'1'的群聊排在最前面
     if (a.roomId === '1' && b.roomId !== '1') return -1

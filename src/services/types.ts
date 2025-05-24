@@ -63,6 +63,21 @@ export type RegisterUserReq = {
   uuid: string
 }
 
+/** 分页翻页 */
+export type PageResponse<T> = {
+  /** 总数 */
+  total: string
+  /** 总页数 */
+  pages: string
+  /** 当前页 */
+  current: string
+  /** 每页大小 */
+  size: string
+  /** 数据 */
+  records: T[]
+}
+
+/** 游标翻页 */
 export type ListResponse<T> = {
   /** 游标（下次翻页带上这参数）*/
   cursor: string
@@ -253,10 +268,10 @@ export type BadgeType = {
 
 export type MarkItemType = {
   /** 操作用户 */
-  uid: string
+  uid: number
   /** 消息id */
-  msgId: string
-  /** 操作类型 1点赞 2举报 */
+  msgId: number
+  /** 操作类型 */
   markType: MarkEnum
   /** 数量 */
   markCount: number
@@ -320,16 +335,15 @@ export type MsgUserType = {
 /**
  * 消息互动信息
  */
-export type MessageMarkType = {
-  /** 点赞 */
-  userLike: number
-  /** 举报 */
-  userDislike: number
-  /** 点赞数 */
-  likeCount: number
-  /** 举报数 */
-  dislikeCount: number
-}
+export type MessageMarkType = Record<
+  string,
+  {
+    /** 该表情的计数 */
+    count: number
+    /** 当前用户是否标记了该表情 */
+    userMarked: boolean
+  }
+>
 
 /** 图片消息体 */
 export type ImageBody = {
@@ -377,6 +391,13 @@ export type TextBody = {
     }
   >
 }
+/** 公告消息体 */
+export type AnnouncementBody = TextBody & {
+  /** 创建时间 */
+  createdTime: number
+  /** 更新时间 */
+  updatedTime: number
+}
 /** 表情消息 */
 export type EmojiBody = {
   url: string
@@ -397,7 +418,7 @@ export type MsgType = {
   /** 发送时间戳 */
   sendTime: number
   /** 消息互动信息 */
-  messageMark: MessageMarkType
+  messageMarks: MessageMarkType
   /** 消息发送状态 */
   status: MessageStatusEnum
 }
@@ -441,7 +462,11 @@ export enum RequestFriendAgreeStatus {
   /** 1待审批 */
   Waiting = 1,
   /** 2同意 */
-  Agree
+  Agree,
+  /** 3拒绝 */
+  Reject,
+  /** 4忽略 */
+  Ignore
 }
 
 /** 请求添加好友的列表项 */
@@ -450,7 +475,7 @@ export type RequestFriendItem = {
   applyId: string
   /** 申请信息 */
   msg: string
-  /** 申请状态 1待审批 2同意 */
+  /** 申请状态 1待审批 2同意 3拒绝 4忽略 */
   status: RequestFriendAgreeStatus
   /** 申请类型 1加好友 */
   type: number
@@ -482,6 +507,8 @@ export enum IsAllUserEnum {
 
 /** 会话列表项 */
 export type SessionItem = {
+  /** hula号 */
+  account: string
   /** 房间最后活跃时间(用来排序) */
   activeTime: number
   /** 会话头像 */
@@ -609,6 +636,22 @@ export type ConfigType = {
   }
   /** 大群ID */
   roomGroupId: string
+}
+
+/** 群组公告 */
+export type AnnouncementItem = {
+  /** 公告ID */
+  id: string
+  /** 房间ID */
+  roomId: string
+  /** 发布者ID */
+  uid: string
+  /** 公告内容 */
+  content: string
+  /** 创建时间 */
+  createdTime: number
+  /** 是否置顶 */
+  top: boolean
 }
 
 /* ======================================================== */

@@ -2,6 +2,7 @@ import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { EventEnum } from '@/enums'
 import { LogicalSize } from '@tauri-apps/api/dpi'
 import { type } from '@tauri-apps/plugin-os'
+import { UserAttentionType } from '@tauri-apps/api/window'
 
 /** 判断是兼容的系统 */
 const isCompatibility = computed(() => type() === 'windows' || type() === 'linux')
@@ -16,6 +17,8 @@ export const useWindow = () => {
    * @param resizable 调整窗口大小
    * @param minW 窗口最小宽度
    * @param minH 窗口最小高度
+   * @param transparent 是否透明
+   * @param visible 是否显示
    * */
   const createWebviewWindow = async (
     title: string,
@@ -24,8 +27,10 @@ export const useWindow = () => {
     height: number,
     wantCloseWindow?: string,
     resizable = false,
-    minW = 310,
-    minH = 495
+    minW = 330,
+    minH = 495,
+    transparent?: boolean,
+    visible = false
   ) => {
     const checkLabel = computed(() => {
       /** 如果是打开独立窗口就截取label中的固定label名称 */
@@ -47,10 +52,10 @@ export const useWindow = () => {
       minWidth: minW,
       skipTaskbar: false,
       decorations: !isCompatibility.value,
-      transparent: isCompatibility.value,
+      transparent: transparent || isCompatibility.value,
       titleBarStyle: 'overlay', // mac覆盖标签栏
       hiddenTitle: true, // mac隐藏标题栏
-      visible: false
+      visible: visible
     })
 
     await webview.once('tauri://created', async () => {
@@ -66,6 +71,66 @@ export const useWindow = () => {
     })
 
     return webview
+  }
+
+  /**
+   * 创建模态子窗口
+   * @param title 窗口标题
+   * @param label 窗口标识
+   * @param width 窗口宽度
+   * @param height 窗口高度
+   * @param parent 父窗口
+   * @returns 创建的窗口实例或已存在的窗口实例
+   */
+  const createModalWindow = async (title: string, label: string, width: number, height: number, parent: string) => {
+    // 检查窗口是否已存在
+    const existingWindow = await WebviewWindow.getByLabel(label)
+    const parentWindow = parent ? await WebviewWindow.getByLabel(parent) : null
+
+    if (existingWindow) {
+      // 如果窗口已存在，则聚焦到现有窗口并使其闪烁
+      existingWindow.requestUserAttention(UserAttentionType.Critical)
+      return existingWindow
+    }
+
+    // 创建新窗口
+    const modalWindow = new WebviewWindow(label, {
+      url: `/${label}`,
+      title: title,
+      width: width,
+      height: height,
+      resizable: false,
+      center: true,
+      minWidth: 500,
+      minHeight: 500,
+      focus: true,
+      parent: parentWindow ? parentWindow : parent,
+      decorations: !isCompatibility.value,
+      transparent: isCompatibility.value,
+      titleBarStyle: 'overlay', // mac覆盖标签栏
+      hiddenTitle: true, // mac隐藏标题栏
+      visible: false
+    })
+
+    // 监听窗口创建完成事件
+    modalWindow.once('tauri://created', async () => {
+      if (type() === 'windows') {
+        // 禁用父窗口，模拟模态窗口效果
+        await parentWindow?.setEnabled(false)
+      }
+
+      // 设置窗口为焦点
+      await modalWindow.setFocus()
+    })
+
+    // 监听错误事件
+    modalWindow.once('tauri://error', async (e) => {
+      console.error(`${title}窗口创建失败:`, e)
+      window.$message?.error(`创建${title}窗口失败`)
+      await parentWindow?.setEnabled(true)
+    })
+
+    return modalWindow
   }
 
   /**
@@ -109,9 +174,25 @@ export const useWindow = () => {
     }
   }
 
+  /**
+   * 设置窗口是否可调整大小
+   * @param label 窗口名称
+   * @param resizable 是否可调整大小
+   */
+  const setResizable = async (label: string, resizable: boolean) => {
+    const webview = await WebviewWindow.getByLabel(label)
+    if (webview) {
+      await webview.setResizable(resizable).catch((error) => {
+        console.error('设置窗口可调整大小失败:', error)
+      })
+    }
+  }
+
   return {
     createWebviewWindow,
+    createModalWindow,
     resizeWindow,
-    checkWinExist
+    checkWinExist,
+    setResizable
   }
 }
